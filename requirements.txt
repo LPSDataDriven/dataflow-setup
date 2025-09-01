@@ -1,7 +1,0 @@
-dbt-core
-dbt-snowflake
-pre-commit
-sqlfluff
-recce
-pandas
-snowflake-snowpark-python

@@ -31,12 +31,15 @@ This will create a virtual environment in the `.venv` directory at the root of t
 source .venv/bin/activate
 ```
 
-5. Add a requirements.txt file with dependencies.
+5. Configure the pyproject.toml file with project dependencies.
 
-6. Install the dependencies in the virtual environment.
+6. Install the project in development mode.
 ```bash
-# Install dependencies
-uv pip install -r requirements.txt
+# Install the project
+uv pip install -e .
+
+# Or install with development dependencies
+uv pip install -e ".[dev]"
 ```
 
 7. Set up environment variables for Snowflake authentication.

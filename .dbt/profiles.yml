@@ -8,6 +8,7 @@ my_dbt_project:
       user: "{{ env_var('SNOWFLAKE_USER') }}"
       role: "{{ env_var('SNOWFLAKE_ROLE') }}"
       private_key_path: "{{ env_var('SNOWFLAKE_PRIVATE_KEY_PATH') }}"
+      private_key_passphrase: "{{ env_var('SNOWFLAKE_PRIVATE_KEY_PASSWORD') }}"
       database: "{{ env_var('SNOWFLAKE_DATABASE_DEV') }}"
       warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE') }}"
       client_session_keep_alive: False

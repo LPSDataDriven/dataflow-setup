@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dbt-snowflake-setup"
+version = "0.1.0"
+description = "DBT pipeline with Snowflake integration and utilities"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "dbt-core",
+    "dbt-snowflake",
+    "pre-commit",
+    "sqlfluff",
+    "recce",
+    "pandas",
+    "snowflake-snowpark-python",
+    "snowflake-connector-python[pandas]",
+    "cryptography",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest",
+    "pytest-mock",
+    "black",
+    "isort",
+    "flake8",
+]
+
+[tool.setuptools.packages.find]
+include = ["snowflake_utils*"]
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.sqlfluff]
+dialect = "snowflake"
+templater = "jinja"
+rules = ["L010", "L014", "L030", "L040", "L050", "L060", "L062"]
