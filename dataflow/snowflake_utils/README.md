@@ -1,6 +1,17 @@
-# Snowflake Connector - Documentação
+# Snowflake Utils - Conector e utilitários para Snowflake
 
-Este módulo fornece uma interface simplificada para conexão e operações com o Snowflake, incluindo suporte a autenticação por senha e chave privada.
+Módulo sob `dataflow/snowflake_utils/connector.py` com funções para conexão e operações no Snowflake (senha ou chave privada).
+
+## Estrutura
+```
+dataflow/
+├── snowflake_utils/
+│   ├── connector.py    # Conector e operações (Core/Snowpark)
+│   ├── README.md
+│   └── ARCHITECTURE.md
+└── snowflake_usage/
+    └── snowflake_test.py  # Exemplo de uso via módulo
+```
 
 ## 📋 Índice
 
@@ -61,7 +72,7 @@ SNOWFLAKE_PRIVATE_KEY_PASSWORD=your_key_password
 ### 1. Conexão Básica
 
 ```python
-from snowflake.connector import get_snowflake_connection_context
+from dataflow.snowflake_utils.connector import get_snowflake_connection_context
 
 # Usar context manager (recomendado)
 with get_snowflake_connection_context() as conn:
@@ -74,7 +85,7 @@ with get_snowflake_connection_context() as conn:
 ### 2. Executar Queries
 
 ```python
-from snowflake.connector import execute_query
+from dataflow.snowflake_utils.connector import execute_query
 
 # Query simples
 df = execute_query("SELECT * FROM my_table LIMIT 10")
@@ -91,7 +102,7 @@ df = execute_query(
 
 ```python
 import pandas as pd
-from snowflake.connector import write_dataframe_to_snowflake
+from dataflow.snowflake_utils.connector import write_dataframe_to_snowflake
 
 # Criar DataFrame
 df = pd.DataFrame({
@@ -111,7 +122,7 @@ success = write_dataframe_to_snowflake(
 ### 4. Sessão Snowpark
 
 ```python
-from snowflake.connector import get_snowflake_session
+from dataflow.snowflake_utils.connector import get_snowflake_session
 
 # Criar sessão
 session = get_snowflake_session()
@@ -129,7 +140,7 @@ session.close()
 ### Exemplo 1: Pipeline de Dados Simples
 
 ```python
-from snowflake.connector import execute_query, write_dataframe_to_snowflake
+from dataflow.snowflake_utils.connector import execute_query, write_dataframe_to_snowflake
 import pandas as pd
 
 # 1. Ler dados
@@ -148,7 +159,7 @@ write_dataframe_to_snowflake(df_transformed, 'transformed_table')
 ### Exemplo 2: Monitoramento de Performance
 
 ```python
-from snowflake.connector import execute_query
+from dataflow.snowflake_utils.connector import execute_query
 
 # Verificar queries recentes
 queries = execute_query("""
@@ -170,7 +181,7 @@ print(f"Executadas {len(queries)} queries na última hora")
 ### Exemplo 3: Backup de Tabela
 
 ```python
-from snowflake.connector import execute_query
+from dataflow.snowflake_utils.connector import execute_query
 
 # Criar backup
 execute_query("""
@@ -265,16 +276,11 @@ df = execute_query("SELECT * FROM large_table")
 print(f"Query executada em {time.time() - start:.2f}s")
 ```
 
-## 🧪 Testes
+## 🧪 Execução via módulo
 
-Execute os testes incluídos:
-
+No diretório raiz do projeto:
 ```bash
-# Teste básico de conexão
-python snowflake/test_connection.py
-
-# Teste de operações avançadas
-python snowflake/test_operations.py
+python -m dataflow.snowflake_usage.snowflake_test
 ```
 
 ## 📚 Recursos Adicionais

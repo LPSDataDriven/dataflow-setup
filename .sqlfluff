@@ -1,0 +1,13 @@
+[sqlfluff]
+dialect = snowflake
+templater = jinja
+sql_file_exts = .sql,.sql.j2,.dml,.ddl
+
+[sqlfluff:rules]
+L010 = enabled
+L014 = enabled
+L030 = enabled
+L040 = enabled
+L050 = enabled
+L060 = enabled
+L062 = enabled

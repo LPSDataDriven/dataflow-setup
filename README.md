@@ -42,9 +42,7 @@ uv pip install -e .
 uv pip install -e ".[dev]"
 ```
 
-7. Set up environment variables for Snowflake authentication.
-Create a `.env` file in the root of the repository and add all the variables.
-Then create an `.envrc` file with the following content:
+7. Set up environment variables. Create a `.env` file in the root of the repository following the .env.example, and add all the variables. Then create an `.envrc` file with the following content:
 ```bash
 # direnv configuration
 dotenv
@@ -101,9 +99,7 @@ pre-commit install
 
 13. Add the .gitignore file with the path to be ignore.
 
-14. Ensure the profiles.yml and the .env variables are configured correctly. Make sure you have a
-Snowflake key-pair created. Set the RSA_PUBLIC_KEY in Snowflake and add the SNOWFLAKE_PRIVATE_KEY_PATH
-into the .env file.
+14. Ensure the profiles.yml and the .env variables are configured correctly. Make sure you have a Snowflake key-pair created. Set the RSA_PUBLIC_KEY in Snowflake and add the SNOWFLAKE_PRIVATE_KEY_PATH into the .env file.
 
 15. Run the following commands to test connection and build the dbt project.
 ```bash

@@ -21,6 +21,11 @@ from snowflake.connector import SnowflakeConnection
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Reduzir verbosidade de loggers de terceiros
+logging.getLogger("snowflake.connector").setLevel(logging.WARNING)
+logging.getLogger("botocore").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+
 
 @dataclass
 class SnowflakeConfig:
@@ -206,7 +211,7 @@ def execute_query(
 
     try:
         with get_snowflake_connection_context(role, warehouse, database, schema) as conn:
-            logger.info(f"Executando query: {query[:100]}...")
+            logger.debug(f"Executando query: {query[:100]}...")
 
             # Usar cursor para evitar warning do pandas
             cursor = conn.cursor()
@@ -216,10 +221,11 @@ def execute_query(
             results = cursor.fetchall()
             column_names = [desc[0] for desc in cursor.description]
 
-            # Criar DataFrame
+            # Criar DataFrame e normalizar nomes de colunas
             df = pd.DataFrame(results, columns=column_names)
+            df.columns = [str(c).lower() for c in df.columns]
 
-            logger.info(f"Query executada com sucesso. Retornou {len(df)} linhas")
+            logger.info(f"Query executada com sucesso ({len(df)} linha(s))")
             return df
     except Exception as e:
         logger.error(f"Erro ao executar query: {e}")
@@ -238,8 +244,13 @@ def test_connection(
             "SELECT CURRENT_TIMESTAMP() as current_time, CURRENT_USER() as current_user, CURRENT_ROLE() as current_role",
             role, warehouse, database, schema
         )
-        logger.info("Teste de conexão bem-sucedido")
-        logger.info(f"DataFrame: {df}")
+        row = df.iloc[0]
+        logger.info(
+            "Conexão OK | Usuário: %s | Role: %s | Hora: %s",
+            row.get("current_user"), row.get("current_role"), row.get("current_time")
+        )
+        logger.debug("Resultado completo: %s", df.to_dict(orient="records"))
+        return True
 
     except Exception as e:
         logger.error(f"Teste de conexão falhou: {e}")

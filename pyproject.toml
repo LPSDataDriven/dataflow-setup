@@ -39,8 +39,3 @@ target-version = ['py38']
 [tool.isort]
 profile = "black"
 line_length = 88
-
-[tool.sqlfluff]
-dialect = "snowflake"
-templater = "jinja"
-rules = ["L010", "L014", "L030", "L040", "L050", "L060", "L062"]
