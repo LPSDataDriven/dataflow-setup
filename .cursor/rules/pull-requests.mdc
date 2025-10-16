@@ -1,0 +1,98 @@
+---
+description: To manipulate GitHub pull requests (PRs)
+globs:
+alwaysApply: false
+---
+# Working with GitHub Pull Requests
+
+* Repository: https://github.com/LPSDataDriven/dataflow-setup
+* Default branch: `main`
+* Branching model: feature branches → `main` via PR
+* Only use the GitHub MCP server and local git commands. Do not try to use the GitHub cli.
+
+## PR Workflow
+
+### Before Creating a PR
+* I will check if you have committed changes and assist in creating a branch and committing if needed
+* I will remind you to ensure the [CHANGELOG.md](mdc:CHANGELOG.md) has been updated in the chat, not in the PR.
+* I will check if a PR already exists for the desired branches
+
+### Creating a PR
+* I will guide you through creating a PR, adhering to project standards:
+  * Draft an appropriate title (concise, descriptive)
+  * Draft a good description following our format guidelines
+  * Ensure the correct base branch is selected for merging
+  * Check with you if edits are needed to the branch, commit contents, or message before finalizing
+  * Avoid assuming all files need to be committed
+* For all merges to `main`, I will:
+  * Ensure the base branch is `main`
+  * Check if the version or Unreleased section in [CHANGELOG.md](mdc:CHANGELOG.md) has been updated and notify if not
+
+### Updating Existing PRs
+* I will get file changes from GitHub to understand the PR's scope
+* After drafting updates or descriptions, I will ask for your confirmation
+* When adding a description, I will use the appropriate tools to update the PR description directly
+* I will offer options for updates on GitHub
+
+### Identifying Changes for PRs to Main
+When preparing a PR from a feature branch to `main`, I will:
+* Run `git fetch --all` to ensure the repository is up-to-date
+* Use `git log origin/main..HEAD --pretty="format:%s" | cat` to summarize commits unique to the feature branch
+* Review file changes via GitHub PR diff and, if needed, examine patches
+* Ensure the [CHANGELOG.md](mdc:CHANGELOG.md) Unreleased section reflects these changes
+
+### PR Description Format (feature → main)
+Use this structure:
+```
+### What
+- Brief summary of the change
+
+### Why
+- Motivation or issue addressed
+
+### How
+- Key implementation notes and scope
+
+### Impact
+- Breaking changes, config updates, migrations (if any)
+
+### Testing
+- How this was validated; how reviewers can test
+```
+
+## PR Description Guidelines
+
+### Format Requirements
+* Use bullet points for clarity
+* Be concise and specific about changes made, avoiding unnecessary explanations
+* Structure from most to least important changes
+* Include field names in backticks: `field_name`
+* When identifying differences, pay attention to which branch the PR will be merged to
+
+### Data Model Changes
+For data model changes, document:
+* New columns/tests added
+* Field descriptions
+* Data sources or mappings
+
+### Examples
+
+#### Good Example
+- Adds not_null tests for `report_date_utc` and `revenue_id` in `dim_mappings_hist`
+- Documents revenue sources for `revenue_id`:
+  - Campaign ID (ABC System)
+  - Mongo campaign ID (XYZ System)
+  - Salesforce Campaign Revenue ID (SFDC)
+
+#### Example to Avoid
+This important PR adds critical validation for the revenue mapping dimension table by ensuring we have proper testing for the report date and revenue ID fields. These changes are necessary to maintain data quality and will help prevent null values in our reports.
+
+## GitHub Write Actions
+
+### Always Seek Confirmation
+* **Before any write action to GitHub** (creating PRs, updating descriptions, adding comments, etc.), I will:
+  * Present all details to you for review
+  * Ask for explicit confirmation before proceeding
+  * Offer options for modifications if changes are requested
+* **Never assume** that all files should be committed or that changes are ready for GitHub
+* **Always ask** if any edits are needed to branch contents, commit messages, or PR details before finalizing
