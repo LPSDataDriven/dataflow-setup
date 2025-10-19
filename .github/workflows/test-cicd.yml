@@ -157,15 +157,34 @@ jobs:
       run: |
         pip install dbt-core dbt-snowflake
 
+    - name: Setup Snowflake private key
+      env:
+        SNOWFLAKE_PRIVATE_KEY_CONTENT: ${{ secrets.SNOWFLAKE_PRIVATE_KEY_CONTENT }}
+      run: |
+        echo "🔑 Configurando chave privada do Snowflake..."
+
+        # Criar diretório para a chave
+        mkdir -p /tmp
+
+        # Salvar chave privada
+        echo "$SNOWFLAKE_PRIVATE_KEY_CONTENT" > /tmp/snowflake_private_key.p8
+
+        # Definir permissões corretas
+        chmod 600 /tmp/snowflake_private_key.p8
+
+        echo "✅ Chave privada configurada"
+
     - name: Validate DBT project
       env:
         SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
         SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-        SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
         SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-        SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+        SNOWFLAKE_DATABASE_DEV: ${{ secrets.SNOWFLAKE_DATABASE_DEV }}
+        SNOWFLAKE_DATABASE_PROD: ${{ secrets.SNOWFLAKE_DATABASE_PROD }}
         SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
         SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+        SNOWFLAKE_PRIVATE_KEY_PATH: /tmp/snowflake_private_key.p8
+        SNOWFLAKE_PRIVATE_KEY_PASSWORD: ${{ secrets.SNOWFLAKE_PRIVATE_KEY_PASSWORD }}
       run: |
         echo "🔍 Validando projeto DBT..."
 
