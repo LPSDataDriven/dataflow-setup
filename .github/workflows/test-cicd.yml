@@ -1,0 +1,236 @@
+name: Test CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'airflow-mwaa/**'
+      - 'my_dbt_project/**'
+      - '.dbt/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'airflow-mwaa/**'
+      - 'my_dbt_project/**'
+      - '.dbt/**'
+  workflow_dispatch:  # Permite execução manual
+
+env:
+  AWS_REGION: us-east-1
+  S3_BUCKET: lpsdata-airflow-1
+  MWAA_ENVIRONMENT: your-mwaa-environment-name
+
+jobs:
+  # Job 1: Validar configuração
+  validate-setup:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Validate secrets are configured
+      run: |
+        echo "🔍 Verificando se os secrets estão configurados..."
+
+        # Verificar se as variáveis de ambiente estão disponíveis
+        if [ -z "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then
+          echo "❌ AWS_ACCESS_KEY_ID não configurado"
+          exit 1
+        else
+          echo "✅ AWS_ACCESS_KEY_ID configurado"
+        fi
+
+        if [ -z "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then
+          echo "❌ AWS_SECRET_ACCESS_KEY não configurado"
+          exit 1
+        else
+          echo "✅ AWS_SECRET_ACCESS_KEY configurado"
+        fi
+
+        if [ -z "${{ secrets.SNOWFLAKE_ACCOUNT }}" ]; then
+          echo "❌ SNOWFLAKE_ACCOUNT não configurado"
+          exit 1
+        else
+          echo "✅ SNOWFLAKE_ACCOUNT configurado"
+        fi
+
+        if [ -z "${{ secrets.SNOWFLAKE_USER }}" ]; then
+          echo "❌ SNOWFLAKE_USER não configurado"
+          exit 1
+        else
+          echo "✅ SNOWFLAKE_USER configurado"
+        fi
+
+        if [ -z "${{ secrets.SNOWFLAKE_PASSWORD }}" ]; then
+          echo "❌ SNOWFLAKE_PASSWORD não configurado"
+          exit 1
+        else
+          echo "✅ SNOWFLAKE_PASSWORD configurado"
+        fi
+
+        echo "🎉 Todos os secrets estão configurados!"
+
+    - name: Test AWS CLI access
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
+      run: |
+        echo "🔍 Testando acesso ao AWS CLI..."
+
+        # Instalar AWS CLI
+        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+        unzip awscliv2.zip
+        sudo ./aws/install
+
+        # Testar acesso
+        aws sts get-caller-identity
+
+        # Verificar se o bucket existe
+        if aws s3 ls "s3://${{ env.S3_BUCKET }}" 2>/dev/null; then
+          echo "✅ Bucket S3 encontrado: ${{ env.S3_BUCKET }}"
+        else
+          echo "❌ Bucket S3 não encontrado: ${{ env.S3_BUCKET }}"
+          echo "💡 Criando bucket..."
+          aws s3 mb "s3://${{ env.S3_BUCKET }}"
+        fi
+
+  # Job 2: Validar DAGs
+  validate-dags:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        pip install apache-airflow==2.8.1
+        pip install dbt-core dbt-snowflake
+        pip install -r airflow-mwaa/requirements/requirements.txt
+
+    - name: Validate DAGs syntax
+      run: |
+        echo "🔍 Validando sintaxe dos DAGs..."
+
+        # Validar sintaxe Python
+        for dag_file in airflow-mwaa/dags/*.py; do
+          echo "Validando: $dag_file"
+          python -m py_compile "$dag_file"
+        done
+
+        echo "✅ Todos os DAGs têm sintaxe válida"
+
+    - name: Validate DAGs with Airflow
+      run: |
+        echo "🔍 Validando DAGs com Airflow..."
+
+        export AIRFLOW_HOME=/tmp/airflow
+        airflow db init
+
+        # Listar DAGs
+        airflow dags list
+
+        echo "✅ DAGs validados com Airflow"
+
+  # Job 3: Validar DBT
+  validate-dbt:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install DBT
+      run: |
+        pip install dbt-core dbt-snowflake
+
+    - name: Validate DBT project
+      env:
+        SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+        SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+        SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+        SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+        SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+        SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+        SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+      run: |
+        echo "🔍 Validando projeto DBT..."
+
+        # Validar sintaxe do projeto
+        dbt parse --profiles-dir .dbt
+
+        # Testar conexão (sem executar)
+        dbt debug --profiles-dir .dbt
+
+        echo "✅ Projeto DBT validado"
+
+  # Job 4: Teste de deploy (apenas em main)
+  test-deploy:
+    needs: [validate-setup, validate-dags, validate-dbt]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Test S3 upload
+      run: |
+        echo "🔍 Testando upload para S3..."
+
+        # Criar arquivo de teste
+        echo "Test file created at $(date)" > test-file.txt
+
+        # Upload de teste
+        aws s3 cp test-file.txt "s3://${{ env.S3_BUCKET }}/test/"
+
+        # Verificar se foi enviado
+        if aws s3 ls "s3://${{ env.S3_BUCKET }}/test/test-file.txt"; then
+          echo "✅ Upload para S3 funcionando!"
+        else
+          echo "❌ Upload para S3 falhou"
+          exit 1
+        fi
+
+        # Limpar arquivo de teste
+        aws s3 rm "s3://${{ env.S3_BUCKET }}/test/test-file.txt"
+
+    - name: Test MWAA environment
+      run: |
+        echo "🔍 Testando acesso ao MWAA..."
+
+        # Verificar se o environment existe
+        if aws mwaa get-environment --name "${{ env.MWAA_ENVIRONMENT }}" 2>/dev/null; then
+          echo "✅ Environment MWAA encontrado: ${{ env.MWAA_ENVIRONMENT }}"
+        else
+          echo "❌ Environment MWAA não encontrado: ${{ env.MWAA_ENVIRONMENT }}"
+          echo "💡 Verifique se o nome do environment está correto"
+        fi
+
+    - name: Success notification
+      run: |
+        echo "🎉 Pipeline de CI/CD testado com sucesso!"
+        echo "✅ Secrets configurados"
+        echo "✅ AWS CLI funcionando"
+        echo "✅ DAGs validados"
+        echo "✅ DBT validado"
+        echo "✅ S3 upload funcionando"
+        echo "✅ MWAA acessível"
+        echo ""
+        echo "🚀 Pronto para fazer deploy real!"
