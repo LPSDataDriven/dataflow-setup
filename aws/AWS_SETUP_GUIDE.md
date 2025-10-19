@@ -1,4 +1,4 @@
-# 🚀 Guia de Configuração AWS para MWAA
+# 🚀 Guia de Configuração AWS para Airflow Local
 
 ## 📋 Credenciais Necessárias
 
@@ -16,10 +16,9 @@ Você precisa de:
 4. Escolha "Application running outside AWS"
 5. Copie as credenciais geradas
 
-### 2. **Configurações MWAA**
+### 2. **Configurações S3**
 
-- **S3 Bucket Name**: Nome do bucket para o Airflow
-- **MWAA Environment Name**: Nome do ambiente MWAA criado
+- **S3 Bucket Name**: Nome do bucket para armazenar artifacts e logs
 
 ### 3. **Credenciais Snowflake (Opcional)**
 
@@ -47,30 +46,98 @@ AWS_ACCESS_KEY_ID=AKIA...
 AWS_SECRET_ACCESS_KEY=...
 AWS_REGION=us-east-1
 S3_BUCKET_NAME=lpsdata-airflow-1
-MWAA_ENVIRONMENT_NAME=seu-ambiente-mwaa
 ```
 
-### Passo 3: Testar conexão
+### Passo 3: Credenciais Snowflake (se usando)
 
 ```bash
-# Instalar dependências
-uv sync
-
-# Executar teste de conexão
-python test_aws_connection.py
+SNOWFLAKE_ACCOUNT=your-account
+SNOWFLAKE_USER=your-user
+SNOWFLAKE_PASSWORD=your-password
+SNOWFLAKE_WAREHOUSE=your-warehouse
+SNOWFLAKE_DATABASE=your-database
+SNOWFLAKE_SCHEMA=your-schema
+SNOWFLAKE_ROLE=your-role
 ```
 
-## ✅ O que o teste verifica
+## 🧪 Como Testar
 
-1. **Credenciais AWS**: Se estão válidas e funcionando
-2. **Acesso S3**: Se consegue acessar o bucket do Airflow
-3. **Ambiente MWAA**: Se o ambiente existe e está acessível
-4. **Secrets Manager**: Se tem permissão para acessar secrets
+### 1. **Teste de Conexão AWS**
+```bash
+# Execute o script de teste
+python aws/test_aws_connection.py
+```
+
+### 2. **Verificações Automáticas**
+O script testa:
+- ✅ **Credenciais AWS**: Se estão válidas
+- ✅ **Bucket S3**: Se existe e é acessível
+- ✅ **Docker**: Se está disponível para Airflow local
+- ✅ **Secrets Manager**: Se tem acesso (opcional)
+
+### 3. **Exemplo de Saída**
+```
+🚀 Teste de Conexão AWS para Airflow Local
+
+📍 Região AWS: us-east-1
+🪣 Bucket S3: lpsdata-airflow-1
+--------------------------------------------------
+🔍 Testando credenciais AWS...
+✅ Credenciais válidas!
+   Account ID: 123456789012
+   User ARN: arn:aws:iam::123456789012:user/your-user
+   User ID: AIDACKCEVSQ6C2EXAMPLE
+
+🪣 Testando acesso ao bucket S3: lpsdata-airflow-1
+✅ Bucket 'lpsdata-airflow-1' acessível!
+   Objetos encontrados: 3
+   - dags/dbt_pipeline.py
+   - logs/airflow.log
+   - artifacts/manifest.json
+
+🐳 Testando disponibilidade do Docker...
+✅ Docker disponível!
+   Versão: Docker version 24.0.7, build afdd53b
+
+🔐 Testando AWS Secrets Manager...
+✅ Secrets Manager acessível!
+   Secrets encontrados: 2
+   - snowflake-credentials
+   - airflow-variables
+
+==================================================
+✅ Teste de conexão concluído!
+```
+
+## 🚨 Troubleshooting
+
+### Erro: "AWS credentials not found"
+**Solução:**
+1. Verifique se o arquivo `.env` existe
+2. Confirme se as variáveis estão corretas
+3. Execute `source .env` ou use `direnv`
+
+### Erro: "S3 bucket not found"
+**Solução:**
+1. Verifique se o bucket existe no AWS Console
+2. Confirme se o nome está correto no `.env`
+3. Verifique permissões IAM
+
+### Erro: "Docker not found"
+**Solução:**
+1. Instale o Docker Desktop
+2. Inicie o Docker daemon
+3. Verifique se está rodando: `docker --version`
+
+### Erro: "Permission denied"
+**Solução:**
+1. Verifique as permissões IAM do usuário
+2. Confirme se tem acesso ao S3 e Secrets Manager
+3. Teste com `aws s3 ls` no terminal
 
 ## 🔐 Permissões IAM Necessárias
 
-Seu usuário AWS precisa das seguintes permissões:
-
+### Política Mínima para S3:
 ```json
 {
     "Version": "2012-10-17",
@@ -84,49 +151,38 @@ Seu usuário AWS precisa das seguintes permissões:
                 "s3:ListBucket"
             ],
             "Resource": [
-                "arn:aws:s3:::lpsdata-airflow-1",
-                "arn:aws:s3:::lpsdata-airflow-1/*"
+                "arn:aws:s3:::your-bucket-name",
+                "arn:aws:s3:::your-bucket-name/*"
             ]
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "mwaa:GetEnvironment",
-                "mwaa:ListEnvironments"
-            ],
-            "Resource": "*"
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "secretsmanager:GetSecretValue",
-                "secretsmanager:ListSecrets"
-            ],
-            "Resource": "*"
         }
     ]
 }
 ```
 
-## 🚨 Troubleshooting
+### Política para Secrets Manager (Opcional):
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "secretsmanager:GetSecretValue",
+                "secretsmanager:DescribeSecret"
+            ],
+            "Resource": "arn:aws:secretsmanager:*:*:secret:*"
+        }
+    ]
+}
+```
 
-### Erro: "NoCredentialsError"
-- Verifique se AWS_ACCESS_KEY_ID e AWS_SECRET_ACCESS_KEY estão corretos
-- Confirme se as credenciais não expiraram
+## 🎯 Próximos Passos
 
-### Erro: "Access Denied" no S3
-- Verifique se o bucket existe
-- Confirme se seu usuário tem permissão de acesso ao bucket
+1. **Configure** as credenciais no `.env`
+2. **Execute** o teste de conexão
+3. **Inicie** o Airflow local com Docker
+4. **Teste** o pipeline completo
 
-### Erro: "MWAA Environment not found"
-- Verifique se o nome do ambiente está correto
-- Confirme se o ambiente está na região correta
+---
 
-## 📞 Próximos Passos
-
-Após configurar as credenciais:
-
-1. **Teste a conexão**: `python test_aws_connection.py`
-2. **Configure o MWAA**: Siga o guia em `airflow-mwaa/README_MWAA_DEPLOYMENT.md`
-3. **Deploy dos DAGs**: Use o script `airflow-mwaa/deploy.sh`
-4. **Teste os pipelines**: Execute os DAGs no MWAA
+**Nota**: Este guia foca em execução local para reduzir custos. Para ambientes de produção, considere soluções gerenciadas como ECS, EKS ou outras plataformas de container.

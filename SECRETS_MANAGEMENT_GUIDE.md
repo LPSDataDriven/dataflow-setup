@@ -6,7 +6,7 @@
 |----------|---------------------------|--------------|-------------|
 | **Local (Docker)** | `.env` | `os.getenv()` | Desenvolvimento |
 | **GitHub Actions** | GitHub Secrets | `${{ secrets.NOME }}` | CI/CD |
-| **MWAA** | AWS Secrets Manager | `SecretsManagerBackend()` | Produção |
+| **Produção (ECS/EKS)** | AWS Secrets Manager | `SecretsManagerBackend()` | Produção |
 | **Airflow UI** | Airflow Variables | `Variable.get()` | Configurações |
 
 ## 🏠 1. Ambiente Local (Docker) - MANTER .env
@@ -66,7 +66,7 @@ SNOWFLAKE_SCHEMA=your_schema
 
 ### Como usar no GitHub Actions:
 ```yaml
-# .github/workflows/deploy-mwaa.yml
+# .github/workflows/deploy.yml
 - name: Deploy to S3
   env:
     SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
@@ -77,14 +77,14 @@ SNOWFLAKE_SCHEMA=your_schema
     # Criar profiles.yml com as credenciais
 ```
 
-## 🏢 3. AWS MWAA - AWS Secrets Manager
+## 🏢 3. Produção (ECS/EKS) - AWS Secrets Manager
 
 ### Criar secret no AWS Secrets Manager:
 ```bash
 # Criar secret
 aws secretsmanager create-secret \
     --name "airflow/snowflake/credentials" \
-    --description "Snowflake credentials for MWAA" \
+    --description "Snowflake credentials for production" \
     --secret-string '{
         "account": "your_account.snowflakecomputing.com",
         "user": "your_username",
@@ -96,9 +96,9 @@ aws secretsmanager create-secret \
     }'
 ```
 
-### Como usar no MWAA:
+### Como usar em produção:
 ```python
-# airflow-mwaa/dags/mwaa_dag.py
+# airflow-local/dags/production_dag.py
 from airflow.providers.amazon.aws.secrets.secrets_manager import SecretsManagerBackend
 
 secrets_backend = SecretsManagerBackend()
@@ -108,7 +108,7 @@ snowflake_creds = secrets_backend.get_conn_uri("airflow/snowflake/credentials")
 ## 🎛️ 4. Airflow UI - Airflow Variables
 
 ### Configurar variáveis no Airflow UI:
-1. Acesse o **Airflow UI** do MWAA
+1. Acesse o **Airflow UI** local
 2. Vá em **Admin** → **Variables**
 3. Clique em **+** para adicionar nova variável
 4. Adicione cada variável:
@@ -147,12 +147,12 @@ target = Variable.get("dbt_target")
 # 1. GitHub Actions executa
 # 2. Usa GitHub Secrets para credenciais
 # 3. Faz upload para S3
-# 4. Atualiza MWAA
+# 4. Atualiza Airflow local
 ```
 
-### **Produção (MWAA):**
+### **Produção (ECS/EKS):**
 ```python
-# 1. MWAA executa DAGs
+# 1. Airflow em produção executa DAGs
 # 2. Usa AWS Secrets Manager para credenciais
 # 3. Usa Airflow Variables para configurações
 # 4. Executa DBT no Snowflake
@@ -169,7 +169,7 @@ from airflow.decorators import task
 from airflow.models import Variable
 from airflow.exceptions import AirflowException
 
-# Tentar importar SecretsManagerBackend (disponível no MWAA)
+# Tentar importar SecretsManagerBackend (disponível em produção)
 try:
     from airflow.providers.amazon.aws.secrets.secrets_manager import SecretsManagerBackend
     SECRETS_MANAGER_AVAILABLE = True
@@ -263,7 +263,7 @@ def get_snowflake_credentials(**context):
 - [ ] Workflow usando `${{ secrets.NOME }}`
 - [ ] Upload para S3 funcionando
 
-### ✅ **AWS MWAA:**
+### ✅ **Produção (ECS/EKS):**
 - [ ] Secret criado no Secrets Manager
 - [ ] Airflow Variables configuradas
 - [ ] DAGs usando `SecretsManagerBackend()`
@@ -300,7 +300,7 @@ print(f"Password: {'*' * len(password)}")  # Mascarar senha
 1. **Mantenha** o `.env` para desenvolvimento local
 2. **Configure** GitHub Secrets para CI/CD
 3. **Crie** secret no AWS Secrets Manager
-4. **Configure** Airflow Variables no MWAA
+4. **Configure** Airflow Variables no Airflow local
 5. **Teste** em cada ambiente
 
 ## ❓ Dúvidas Frequentes

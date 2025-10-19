@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main, develop ]
     paths:
-      - 'airflow-mwaa/**'
+      - 'airflow-local/**'
       - 'dbt/**'
       - '.dbt/**'
       - '.github/workflows/**'
@@ -12,7 +12,7 @@ on:
   pull_request:
     branches: [ main, develop ]
     paths:
-      - 'airflow-mwaa/**'
+      - 'airflow-local/**'
       - 'dbt/**'
       - '.dbt/**'
       - '.github/workflows/**'
@@ -22,7 +22,6 @@ on:
 env:
   AWS_REGION: us-east-1
   S3_BUCKET: lpsdata-airflow-1
-  MWAA_ENVIRONMENT: your-mwaa-environment-name
 
 jobs:
   # Job 1: Validar configuração
@@ -38,35 +37,35 @@ jobs:
         echo "🔍 Verificando se os secrets estão configurados..."
 
         # Verificar se as variáveis de ambiente estão disponíveis
-        if [ -z "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then
+        if [ -z "${AWS_ACCESS_KEY_ID}" ]; then
           echo "❌ AWS_ACCESS_KEY_ID não configurado"
           exit 1
         else
           echo "✅ AWS_ACCESS_KEY_ID configurado"
         fi
 
-        if [ -z "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then
+        if [ -z "${AWS_SECRET_ACCESS_KEY}" ]; then
           echo "❌ AWS_SECRET_ACCESS_KEY não configurado"
           exit 1
         else
           echo "✅ AWS_SECRET_ACCESS_KEY configurado"
         fi
 
-        if [ -z "${{ secrets.SNOWFLAKE_ACCOUNT }}" ]; then
+        if [ -z "${SNOWFLAKE_ACCOUNT}" ]; then
           echo "❌ SNOWFLAKE_ACCOUNT não configurado"
           exit 1
         else
           echo "✅ SNOWFLAKE_ACCOUNT configurado"
         fi
 
-        if [ -z "${{ secrets.SNOWFLAKE_USER }}" ]; then
+        if [ -z "${SNOWFLAKE_USER}" ]; then
           echo "❌ SNOWFLAKE_USER não configurado"
           exit 1
         else
           echo "✅ SNOWFLAKE_USER configurado"
         fi
 
-        if [ -z "${{ secrets.SNOWFLAKE_PASSWORD }}" ]; then
+        if [ -z "${SNOWFLAKE_PASSWORD}" ]; then
           echo "❌ SNOWFLAKE_PASSWORD não configurado"
           exit 1
         else
@@ -74,6 +73,12 @@ jobs:
         fi
 
         echo "🎉 Todos os secrets estão configurados!"
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+        SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+        SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
 
     - name: Test AWS CLI access
       env:
@@ -118,14 +123,14 @@ jobs:
         pip install --upgrade pip
         pip install apache-airflow==2.8.1
         pip install dbt-core dbt-snowflake
-        pip install -r airflow-mwaa/requirements/requirements.txt
+        pip install -r airflow-local/requirements/requirements.txt
 
     - name: Validate DAGs syntax
       run: |
         echo "🔍 Validando sintaxe dos DAGs..."
 
         # Validar sintaxe Python
-        for dag_file in airflow-mwaa/dags/*.py; do
+        for dag_file in airflow-local/dags/*.py; do
           echo "Validando: $dag_file"
           python -m py_compile "$dag_file"
         done
@@ -241,16 +246,16 @@ jobs:
         # Limpar arquivo de teste
         aws s3 rm "s3://${{ env.S3_BUCKET }}/test/test-file.txt"
 
-    - name: Test MWAA environment
+    - name: Test Airflow local setup
       run: |
-        echo "🔍 Testando acesso ao MWAA..."
+        echo "🔍 Testando configuração do Airflow local..."
 
-        # Verificar se o environment existe
-        if aws mwaa get-environment --name "${{ env.MWAA_ENVIRONMENT }}" 2>/dev/null; then
-          echo "✅ Environment MWAA encontrado: ${{ env.MWAA_ENVIRONMENT }}"
+        # Verificar se o Docker está disponível
+        if docker --version 2>/dev/null; then
+          echo "✅ Docker disponível para execução local do Airflow"
         else
-          echo "❌ Environment MWAA não encontrado: ${{ env.MWAA_ENVIRONMENT }}"
-          echo "💡 Verifique se o nome do environment está correto"
+          echo "❌ Docker não encontrado - necessário para execução local"
+          echo "💡 Considere usar Airflow local com Docker Compose"
         fi
 
     - name: Success notification
@@ -261,6 +266,6 @@ jobs:
         echo "✅ DAGs validados"
         echo "✅ DBT validado"
         echo "✅ S3 upload funcionando"
-        echo "✅ MWAA acessível"
+        echo "✅ Airflow local configurado"
         echo ""
-        echo "🚀 Pronto para fazer deploy real!"
+        echo "🚀 Pronto para execução local com Docker!"

@@ -63,30 +63,20 @@ def test_s3_access(bucket_name, region='us-east-1'):
             print(f"❌ Erro ao acessar bucket: {e}")
         return False
 
-def test_mwaa_environment(env_name, region='us-east-1'):
-    """Testa se o ambiente MWAA existe"""
-    print(f"\n🌪️  Testando ambiente MWAA: {env_name}")
+def test_docker_availability():
+    """Testa se o Docker está disponível para execução local"""
+    print(f"\n🐳 Testando disponibilidade do Docker...")
 
     try:
-        mwaa = boto3.client('mwaa', region_name=region)
-
-        response = mwaa.get_environment(Name=env_name)
-        env = response['Environment']
-
-        print(f"✅ Ambiente MWAA encontrado!")
-        print(f"   Status: {env['Status']}")
-        print(f"   Airflow Version: {env['AirflowVersion']}")
-        print(f"   Environment Class: {env['EnvironmentClass']}")
-        print(f"   Max Workers: {env['MaxWorkers']}")
-
+        import subprocess
+        result = subprocess.run(['docker', '--version'],
+                              capture_output=True, text=True, check=True)
+        print(f"✅ Docker disponível!")
+        print(f"   Versão: {result.stdout.strip()}")
         return True
-
-    except ClientError as e:
-        error_code = e.response['Error']['Code']
-        if error_code == 'ResourceNotFoundException':
-            print(f"❌ Ambiente MWAA '{env_name}' não encontrado!")
-        else:
-            print(f"❌ Erro ao acessar MWAA: {e}")
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        print(f"❌ Docker não encontrado!")
+        print(f"   Instale o Docker para execução local do Airflow")
         return False
 
 def test_secrets_manager(region='us-east-1'):
@@ -115,7 +105,7 @@ def test_secrets_manager(region='us-east-1'):
 
 def main():
     """Função principal"""
-    print("🚀 Teste de Conexão AWS para MWAA\n")
+    print("🚀 Teste de Conexão AWS para Airflow Local\n")
 
     # Carrega variáveis de ambiente
     load_dotenv()
@@ -123,11 +113,9 @@ def main():
     # Configurações do arquivo .env
     aws_region = os.getenv('AWS_REGION', 'us-east-1')
     s3_bucket = os.getenv('S3_BUCKET_NAME')
-    mwaa_env = os.getenv('MWAA_ENVIRONMENT_NAME')
 
     print(f"📍 Região AWS: {aws_region}")
     print(f"🪣 Bucket S3: {s3_bucket}")
-    print(f"🌪️  Ambiente MWAA: {mwaa_env}")
     print("-" * 50)
 
     # Testa credenciais
@@ -141,11 +129,8 @@ def main():
     else:
         print("\n⚠️  S3_BUCKET_NAME não configurado no .env")
 
-    # Testa MWAA se ambiente foi especificado
-    if mwaa_env:
-        test_mwaa_environment(mwaa_env, aws_region)
-    else:
-        print("\n⚠️  MWAA_ENVIRONMENT_NAME não configurado no .env")
+    # Testa Docker para execução local
+    test_docker_availability()
 
     # Testa Secrets Manager
     test_secrets_manager(aws_region)

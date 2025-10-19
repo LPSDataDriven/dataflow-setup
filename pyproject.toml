@@ -40,7 +40,6 @@ line_length = 88
 
 [tool.airflow]
 local_airflow_version = "2.8.0"
-mwaa_airflow_version = "2.8.0"
 
 [tool.aws]
 default_region = "us-east-1"
