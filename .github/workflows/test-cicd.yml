@@ -5,14 +5,18 @@ on:
     branches: [ main, develop ]
     paths:
       - 'airflow-mwaa/**'
-      - 'my_dbt_project/**'
+      - 'dbt/**'
       - '.dbt/**'
+      - '.github/workflows/**'
+      - 'aws/**'
   pull_request:
     branches: [ main, develop ]
     paths:
       - 'airflow-mwaa/**'
-      - 'my_dbt_project/**'
+      - 'dbt/**'
       - '.dbt/**'
+      - '.github/workflows/**'
+      - 'aws/**'
   workflow_dispatch:  # Permite execução manual
 
 env:
@@ -166,10 +170,11 @@ jobs:
         echo "🔍 Validando projeto DBT..."
 
         # Validar sintaxe do projeto
-        dbt parse --profiles-dir .dbt
+        cd dbt
+        dbt parse --profiles-dir ../.dbt
 
         # Testar conexão (sem executar)
-        dbt debug --profiles-dir .dbt
+        dbt debug --profiles-dir ../.dbt
 
         echo "✅ Projeto DBT validado"
 
