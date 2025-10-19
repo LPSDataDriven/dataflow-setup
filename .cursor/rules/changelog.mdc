@@ -1,0 +1,70 @@
+---
+description:
+globs: CHANGELOG.md
+alwaysApply: false
+---
+
+# Changelog Maintenance
+
+This rule applies to [CHANGELOG.md](mdc:CHANGELOG.md)
+
+## How to Maintain Our Changelog
+
+Our project follows the [Keep a Changelog](mdc:https:/keepachangelog.com) format. Follow these guidelines when making changes:
+
+### When to Update
+
+- Add entries to the "Unreleased" section **as you make changes** - don't wait until release time
+- Each PR should include changelog updates relevant to the changes being made
+- Move "Unreleased" changes to a versioned section when creating a release
+- Add new changes at the top of the file
+
+### Formatting Guidelines
+
+- Group changes by type:
+  - **Added**: New features
+  - **Changed**: Changes to existing functionality
+  - **Deprecated**: Soon-to-be removed features
+  - **Removed**: Removed features
+  - **Fixed**: Bug fixes
+  - **Security**: Vulnerability fixes
+- Be concise but descriptive
+- Use present tense ("Add feature" not "Added feature")
+- Group related changes under sub-bullets when appropriate
+- Keep user perspective in mind - focus on impact, not implementation
+
+### Versioning
+
+- Follow [Semantic Versioning](mdc:https:/semver.org) (MAJOR.MINOR.PATCH)
+- During initial development (0.y.z): increment minor for significant changes
+- Include the release date in ISO format (YYYY-MM-DD)
+
+### Example Process
+
+1. Make code changes
+2. Add descriptive entry to "Unreleased" section
+3. When releasing:
+   - Move "Unreleased" items to new versioned section
+   - Set the version number and date
+   - Create new empty "Unreleased" section
+
+### Good Example
+
+```markdown
+## [Unreleased]
+
+### Added
+- Initial Dataflow setup scaffolding for `dataflow-setup`
+
+### Changed
+- Update PR drafting docs to use `main` as default branch
+
+### Fixed
+- Correct repository links in Cursor commands
+
+## [0.1.0] - 2025-10-16
+
+### Added
+- Base project structure (Airflow, Dataflow, dbt)
+- Pre-commit hooks and linting configs
+```
