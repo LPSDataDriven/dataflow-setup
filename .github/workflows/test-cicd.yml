@@ -28,6 +28,7 @@ jobs:
   # Job 1: Validar configuração
   validate-setup:
     runs-on: ubuntu-latest
+    environment: lpsdata-dataflow
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -102,6 +103,7 @@ jobs:
   # Job 2: Validar DAGs
   validate-dags:
     runs-on: ubuntu-latest
+    environment: lpsdata-dataflow
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -145,6 +147,7 @@ jobs:
   # Job 3: Validar DBT
   validate-dbt:
     runs-on: ubuntu-latest
+    environment: lpsdata-dataflow
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -203,6 +206,7 @@ jobs:
   test-deploy:
     needs: [validate-setup, validate-dags, validate-dbt]
     runs-on: ubuntu-latest
+    environment: lpsdata-dataflow
     if: github.ref == 'refs/heads/main'
 
     steps:
