@@ -113,6 +113,7 @@ jobs:
 
     - name: Install dependencies
       run: |
+        pip install --upgrade pip
         pip install apache-airflow==2.8.1
         pip install dbt-core dbt-snowflake
         pip install -r airflow-mwaa/requirements/requirements.txt
@@ -155,6 +156,7 @@ jobs:
 
     - name: Install DBT
       run: |
+        pip install --upgrade pip
         pip install dbt-core dbt-snowflake
 
     - name: Setup Snowflake private key
