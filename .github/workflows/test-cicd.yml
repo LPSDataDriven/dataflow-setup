@@ -8,7 +8,7 @@ on:
       - 'my_dbt_project/**'
       - '.dbt/**'
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
     paths:
       - 'airflow-mwaa/**'
       - 'my_dbt_project/**'
