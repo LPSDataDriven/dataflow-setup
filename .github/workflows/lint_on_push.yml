@@ -23,6 +23,8 @@ jobs:
       env:
         SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT || 'dummy_account' }}
         SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER || 'dummy_user' }}
+        SNOWFLAKE_PRIVATE_KEY_PATH: ${{ secrets.SNOWFLAKE_PRIVATE_KEY_PATH || 'dummy_private_key_path' }}
+        SNOWFLAKE_PRIVATE_KEY_PASSWORD: ${{ secrets.SNOWFLAKE_PRIVATE_KEY_PASSWORD || 'dummy_private_key_password' }}
         SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD || 'dummy_password' }}
         SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE || 'DUMMY_WH' }}
         SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE_DEV || 'DUMMY_DB' }}
