@@ -24,29 +24,11 @@ jobs:
           python -m pip install dbt-core dbt-snowflake
           python -m pip install sqlfluff-templater-dbt
 
-      - name: Create dummy private key
-        run: |
-          echo "-----BEGIN PRIVATE KEY-----" > /tmp/dummy_key.p8
-          echo "dummy_key_content_for_linting" >> /tmp/dummy_key.p8
-          echo "-----END PRIVATE KEY-----" >> /tmp/dummy_key.p8
-          chmod 600 /tmp/dummy_key.p8
-
       - name: Lint SQL files with SQLFluff
-        env:
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT || 'dummy_account' }}
-          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER || 'dummy_user' }}
-          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE || 'PUBLIC' }}
-          SNOWFLAKE_PRIVATE_KEY_PATH: /tmp/dummy_key.p8
-          SNOWFLAKE_PRIVATE_KEY_PASSWORD: ${{ secrets.SNOWFLAKE_PRIVATE_KEY_PASSWORD || 'dummy_password' }}
-          SNOWFLAKE_DATABASE_DEV: ${{ secrets.SNOWFLAKE_DATABASE_DEV || 'DUMMY_DB' }}
-          SNOWFLAKE_DATABASE_PROD: ${{ secrets.SNOWFLAKE_DATABASE_PROD || 'DUMMY_DB_PROD' }}
-          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE || 'DUMMY_WH' }}
-          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA || 'PUBLIC' }}
-          SNOWFLAKE_QUERY_TAG: ${{ secrets.SNOWFLAKE_QUERY_TAG || 'dbt_lint' }}
         run: |
           echo "🔍 Executando SQLFluff com regras do .sqlfluff..."
 
-          # Lint todos os arquivos SQL no projeto (usa configuração do .sqlfluff)
-          sqlfluff lint dbt/
+          # Lint apenas arquivos SQL sem tentar conectar ao banco
+          sqlfluff lint dbt/ --dialect snowflake --templater jinja
 
           echo "✅ SQLFluff executado com sucesso!"
