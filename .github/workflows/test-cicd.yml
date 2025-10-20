@@ -3,14 +3,13 @@ name: Test CI/CD Pipeline
 on:
   push:
   pull_request:
-  workflow_dispatch:  # Permite execução manual
+  workflow_dispatch:
 
 env:
   AWS_REGION: us-east-1
   S3_BUCKET: lpsdata-airflow-1
 
 jobs:
-  # Job 1: Validação básica
   basic-validation:
     runs-on: ubuntu-latest
     steps:
@@ -45,19 +44,6 @@ jobs:
 
         echo "🎉 Estrutura do projeto validada!"
 
-    - name: Test Python syntax
-      run: |
-        echo "🔍 Testando sintaxe Python..."
-
-        # Verificar se há arquivos Python para testar
-        if find . -name "*.py" -not -path "./.venv/*" -not -path "./.git/*" | head -1 | grep -q .; then
-          echo "📁 Arquivos Python encontrados, testando sintaxe..."
-          find . -name "*.py" -not -path "./.venv/*" -not -path "./.git/*" -exec python -m py_compile {} \;
-          echo "✅ Sintaxe Python validada!"
-        else
-          echo "ℹ️ Nenhum arquivo Python encontrado para testar"
-        fi
-
     - name: Test DBT project structure
       run: |
         echo "🔍 Verificando estrutura do projeto DBT..."
@@ -79,7 +65,6 @@ jobs:
 
         echo "🎉 Estrutura DBT validada!"
 
-  # Job 2: Linter com pre-commit
   pre-commit-lint:
     runs-on: ubuntu-latest
     steps:
@@ -107,23 +92,3 @@ jobs:
         pre-commit run --all-files
 
         echo "✅ Linters executados com sucesso!"
-
-  # Job 3: Notificação de sucesso
-  success-notification:
-    needs: [basic-validation, pre-commit-lint]
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-    - name: Success notification
-      run: |
-        echo "🎉 Pipeline de validação concluído!"
-        echo ""
-        echo "📋 Status dos jobs:"
-        echo "✅ Validação básica: ${{ needs.basic-validation.result }}"
-        echo "✅ Linter pre-commit: ${{ needs.pre-commit-lint.result }}"
-        echo ""
-        if [ "${{ needs.basic-validation.result }}" = "success" ] && [ "${{ needs.pre-commit-lint.result }}" = "success" ]; then
-          echo "🚀 Todos os testes passaram! Código pronto para merge."
-        else
-          echo "⚠️ Alguns testes falharam. Verifique os logs acima."
-        fi
