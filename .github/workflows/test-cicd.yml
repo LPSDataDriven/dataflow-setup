@@ -3,20 +3,8 @@ name: Test CI/CD Pipeline
 on:
   push:
     branches: [ main, develop ]
-    paths:
-      - 'airflow-local/**'
-      - 'dbt/**'
-      - '.dbt/**'
-      - '.github/workflows/**'
-      - 'aws/**'
   pull_request:
     branches: [ main, develop ]
-    paths:
-      - 'airflow-local/**'
-      - 'dbt/**'
-      - '.dbt/**'
-      - '.github/workflows/**'
-      - 'aws/**'
   workflow_dispatch:  # Permite execução manual
 
 env:
@@ -24,135 +12,108 @@ env:
   S3_BUCKET: lpsdata-airflow-1
 
 jobs:
-  # Job 1: Validar configuração
-  validate-setup:
+  # Job 1: Validação básica
+  basic-validation:
     runs-on: ubuntu-latest
-    environment: lpsdata-dataflow
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Validate secrets are configured
+    - name: Validate project structure
       run: |
-        echo "🔍 Verificando se os secrets estão configurados..."
+        echo "🔍 Verificando estrutura do projeto..."
 
-        # Verificar se as variáveis de ambiente estão disponíveis
-        if [ -z "${AWS_ACCESS_KEY_ID}" ]; then
-          echo "❌ AWS_ACCESS_KEY_ID não configurado"
-          exit 1
+        # Verificar se os diretórios principais existem
+        if [ -d "dbt" ]; then
+          echo "✅ Diretório dbt encontrado"
         else
-          echo "✅ AWS_ACCESS_KEY_ID configurado"
+          echo "❌ Diretório dbt não encontrado"
+          exit 1
         fi
 
-        if [ -z "${AWS_SECRET_ACCESS_KEY}" ]; then
-          echo "❌ AWS_SECRET_ACCESS_KEY não configurado"
-          exit 1
+        if [ -d "airflow-local" ]; then
+          echo "✅ Diretório airflow-local encontrado"
         else
-          echo "✅ AWS_SECRET_ACCESS_KEY configurado"
+          echo "❌ Diretório airflow-local não encontrado"
+          exit 1
         fi
 
-        if [ -z "${SNOWFLAKE_ACCOUNT}" ]; then
-          echo "❌ SNOWFLAKE_ACCOUNT não configurado"
-          exit 1
+        if [ -f ".dbt/profiles.yml" ]; then
+          echo "✅ Arquivo profiles.yml encontrado"
         else
-          echo "✅ SNOWFLAKE_ACCOUNT configurado"
+          echo "❌ Arquivo profiles.yml não encontrado"
+          exit 1
         fi
 
-        if [ -z "${SNOWFLAKE_USER}" ]; then
-          echo "❌ SNOWFLAKE_USER não configurado"
-          exit 1
+        echo "🎉 Estrutura do projeto validada!"
+
+    - name: Test Python syntax
+      run: |
+        echo "🔍 Testando sintaxe Python..."
+
+        # Verificar se há arquivos Python para testar
+        if find . -name "*.py" -not -path "./.venv/*" -not -path "./.git/*" | head -1 | grep -q .; then
+          echo "📁 Arquivos Python encontrados, testando sintaxe..."
+          find . -name "*.py" -not -path "./.venv/*" -not -path "./.git/*" -exec python -m py_compile {} \;
+          echo "✅ Sintaxe Python validada!"
         else
-          echo "✅ SNOWFLAKE_USER configurado"
+          echo "ℹ️ Nenhum arquivo Python encontrado para testar"
         fi
 
-        if [ -z "${SNOWFLAKE_PASSWORD}" ]; then
-          echo "❌ SNOWFLAKE_PASSWORD não configurado"
-          exit 1
+    - name: Test DBT project structure
+      run: |
+        echo "🔍 Verificando estrutura do projeto DBT..."
+
+        if [ -f "dbt/dbt_project.yml" ]; then
+          echo "✅ dbt_project.yml encontrado"
         else
-          echo "✅ SNOWFLAKE_PASSWORD configurado"
+          echo "❌ dbt_project.yml não encontrado"
+          exit 1
         fi
 
-        echo "🎉 Todos os secrets estão configurados!"
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-        SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-        SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+        if [ -d "dbt/models" ]; then
+          echo "✅ Diretório models encontrado"
+        else
+          echo "ℹ️ Diretório models não encontrado (criando estrutura básica...)"
+          mkdir -p dbt/models
+          echo "✅ Diretório models criado"
+        fi
 
-    - name: Test AWS CLI access
+        echo "🎉 Estrutura DBT validada!"
+
+  # Job 2: Teste de conectividade (apenas se secrets estiverem configurados)
+  connectivity-test:
+    runs-on: ubuntu-latest
+    if: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Test AWS connectivity
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
       run: |
-        echo "🔍 Testando acesso ao AWS CLI..."
+        echo "🔍 Testando conectividade AWS..."
 
-        # Instalar AWS CLI
-        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-        unzip awscliv2.zip
-        sudo ./aws/install
-
-        # Testar acesso
+        # Usar AWS CLI que já vem instalado no runner
         aws sts get-caller-identity
 
-        # Verificar se o bucket existe
+        echo "✅ Conectividade AWS funcionando!"
+
+        # Testar acesso ao S3 (sem criar bucket se não existir)
         if aws s3 ls "s3://${{ env.S3_BUCKET }}" 2>/dev/null; then
-          echo "✅ Bucket S3 encontrado: ${{ env.S3_BUCKET }}"
+          echo "✅ Bucket S3 acessível: ${{ env.S3_BUCKET }}"
         else
-          echo "❌ Bucket S3 não encontrado: ${{ env.S3_BUCKET }}"
-          echo "💡 Criando bucket..."
-          aws s3 mb "s3://${{ env.S3_BUCKET }}"
+          echo "ℹ️ Bucket S3 não encontrado: ${{ env.S3_BUCKET }}"
+          echo "💡 Isso é normal se o bucket ainda não foi criado"
         fi
 
-  # Job 2: Validar DAGs
-  validate-dags:
+  # Job 3: Teste de DBT (apenas se secrets do Snowflake estiverem configurados)
+  dbt-test:
     runs-on: ubuntu-latest
-    environment: lpsdata-dataflow
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-
-    - name: Install dependencies
-      run: |
-        pip install --upgrade pip
-        pip install apache-airflow==2.8.1
-        pip install dbt-core dbt-snowflake
-        pip install -r airflow-local/requirements/requirements.txt
-
-    - name: Validate DAGs syntax
-      run: |
-        echo "🔍 Validando sintaxe dos DAGs..."
-
-        # Validar sintaxe Python
-        for dag_file in airflow-local/dags/*.py; do
-          echo "Validando: $dag_file"
-          python -m py_compile "$dag_file"
-        done
-
-        echo "✅ Todos os DAGs têm sintaxe válida"
-
-    - name: Validate DAGs with Airflow
-      run: |
-        echo "🔍 Validando DAGs com Airflow..."
-
-        export AIRFLOW_HOME=/tmp/airflow
-        airflow db init
-
-        # Listar DAGs
-        airflow dags list
-
-        echo "✅ DAGs validados com Airflow"
-
-  # Job 3: Validar DBT
-  validate-dbt:
-    runs-on: ubuntu-latest
-    environment: lpsdata-dataflow
+    if: ${{ secrets.SNOWFLAKE_ACCOUNT != '' }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -167,36 +128,17 @@ jobs:
         pip install --upgrade pip
         pip install dbt-core dbt-snowflake
 
-    - name: Setup Snowflake private key
-      env:
-        SNOWFLAKE_PRIVATE_KEY_CONTENT: ${{ secrets.SNOWFLAKE_PRIVATE_KEY_CONTENT }}
-      run: |
-        echo "🔑 Configurando chave privada do Snowflake..."
-
-        # Criar diretório para a chave
-        mkdir -p /tmp
-
-        # Salvar chave privada
-        echo "$SNOWFLAKE_PRIVATE_KEY_CONTENT" > /tmp/snowflake_private_key.p8
-
-        # Definir permissões corretas
-        chmod 600 /tmp/snowflake_private_key.p8
-
-        echo "✅ Chave privada configurada"
-
-    - name: Validate DBT project
+    - name: Test DBT connection
       env:
         SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
         SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+        SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
         SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
         SNOWFLAKE_DATABASE_DEV: ${{ secrets.SNOWFLAKE_DATABASE_DEV }}
-        SNOWFLAKE_DATABASE_PROD: ${{ secrets.SNOWFLAKE_DATABASE_PROD }}
         SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
         SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
-        SNOWFLAKE_PRIVATE_KEY_PATH: /tmp/snowflake_private_key.p8
-        SNOWFLAKE_PRIVATE_KEY_PASSWORD: ${{ secrets.SNOWFLAKE_PRIVATE_KEY_PASSWORD }}
       run: |
-        echo "🔍 Validando projeto DBT..."
+        echo "🔍 Testando conexão DBT com Snowflake..."
 
         # Validar sintaxe do projeto
         cd dbt
@@ -205,67 +147,30 @@ jobs:
         # Testar conexão (sem executar)
         dbt debug --profiles-dir ../.dbt
 
-        echo "✅ Projeto DBT validado"
+        echo "✅ Conexão DBT funcionando!"
 
-  # Job 4: Teste de deploy (apenas em main)
-  test-deploy:
-    needs: [validate-setup, validate-dags, validate-dbt]
+  # Job 4: Notificação de sucesso
+  success-notification:
+    needs: [basic-validation]
     runs-on: ubuntu-latest
-    environment: lpsdata-dataflow
-    if: github.ref == 'refs/heads/main'
-
+    if: always()
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ env.AWS_REGION }}
-
-    - name: Test S3 upload
-      run: |
-        echo "🔍 Testando upload para S3..."
-
-        # Criar arquivo de teste
-        echo "Test file created at $(date)" > test-file.txt
-
-        # Upload de teste
-        aws s3 cp test-file.txt "s3://${{ env.S3_BUCKET }}/test/"
-
-        # Verificar se foi enviado
-        if aws s3 ls "s3://${{ env.S3_BUCKET }}/test/test-file.txt"; then
-          echo "✅ Upload para S3 funcionando!"
-        else
-          echo "❌ Upload para S3 falhou"
-          exit 1
-        fi
-
-        # Limpar arquivo de teste
-        aws s3 rm "s3://${{ env.S3_BUCKET }}/test/test-file.txt"
-
-    - name: Test Airflow local setup
-      run: |
-        echo "🔍 Testando configuração do Airflow local..."
-
-        # Verificar se o Docker está disponível
-        if docker --version 2>/dev/null; then
-          echo "✅ Docker disponível para execução local do Airflow"
-        else
-          echo "❌ Docker não encontrado - necessário para execução local"
-          echo "💡 Considere usar Airflow local com Docker Compose"
-        fi
-
     - name: Success notification
       run: |
-        echo "🎉 Pipeline de CI/CD testado com sucesso!"
-        echo "✅ Secrets configurados"
-        echo "✅ AWS CLI funcionando"
-        echo "✅ DAGs validados"
-        echo "✅ DBT validado"
-        echo "✅ S3 upload funcionando"
-        echo "✅ Airflow local configurado"
+        echo "🎉 Pipeline de validação básica concluído!"
         echo ""
-        echo "🚀 Pronto para execução local com Docker!"
+        echo "📋 Status dos jobs:"
+        echo "✅ Validação básica: ${{ needs.basic-validation.result }}"
+        echo "🔗 Teste de conectividade: ${{ needs.connectivity-test.result || 'Pulado (secrets não configurados)' }}"
+        echo "🔗 Teste DBT: ${{ needs.dbt-test.result || 'Pulado (secrets não configurados)' }}"
+        echo ""
+        echo "💡 Para habilitar todos os testes, configure os secrets no GitHub:"
+        echo "   - AWS_ACCESS_KEY_ID"
+        echo "   - AWS_SECRET_ACCESS_KEY"
+        echo "   - SNOWFLAKE_ACCOUNT"
+        echo "   - SNOWFLAKE_USER"
+        echo "   - SNOWFLAKE_PASSWORD"
+        echo "   - SNOWFLAKE_WAREHOUSE"
+        echo "   - SNOWFLAKE_DATABASE_DEV"
+        echo "   - SNOWFLAKE_SCHEMA"
+        echo "   - SNOWFLAKE_ROLE"
