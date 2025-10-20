@@ -18,17 +18,8 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install SQLFluff and dependencies
-        run: |
-          python -m pip install sqlfluff
-          python -m pip install dbt-core dbt-snowflake
-          python -m pip install sqlfluff-templater-dbt
+      - name: Install SQLFluff
+        run: "python -m pip install sqlfluff"
 
-      - name: Lint SQL files with SQLFluff
-        run: |
-          echo "🔍 Executando SQLFluff com regras do .sqlfluff..."
-
-          # Lint apenas arquivos SQL sem tentar conectar ao banco
-          sqlfluff lint dbt/ --dialect snowflake --templater jinja
-
-          echo "✅ SQLFluff executado com sucesso!"
+      - name: Lint modified files
+        run: "diff-quality --violations sqlfluff --compare-branch remotes/origin/main --fail-under=100"
