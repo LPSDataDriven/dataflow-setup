@@ -3,6 +3,7 @@ name: Test CI/CD Pipeline
 on:
   push:
   pull_request:
+    branches: [ main, develop ]
   workflow_dispatch:
 
 env:
@@ -82,6 +83,16 @@ jobs:
         pip install pre-commit
 
     - name: Run pre-commit
+      env:
+        SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT || 'dummy_account' }}
+        SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER || 'dummy_user' }}
+        SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD || 'dummy_password' }}
+        SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE || 'DUMMY_WH' }}
+        SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE_DEV || 'DUMMY_DB' }}
+        SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA || 'PUBLIC' }}
+        SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE || 'PUBLIC' }}
+        DBT_TARGET: dev
+        DBT_PROFILES_DIR: ./.dbt
       run: |
         echo "🔍 Executando linters com pre-commit..."
 
