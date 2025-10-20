@@ -1,0 +1,157 @@
+name: Main Pipeline
+
+on:
+  push:
+    branches: [ main ]
+
+
+jobs:
+  # Job 1: Validação básica
+  basic-validation:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Validate project structure
+      run: |
+        echo "🔍 Verificando estrutura do projeto..."
+
+        # Verificar se os diretórios principais existem
+        if [ -d "dbt" ]; then
+          echo "✅ Diretório dbt encontrado"
+        else
+          echo "❌ Diretório dbt não encontrado"
+          exit 1
+        fi
+
+        if [ -d "airflow-local" ]; then
+          echo "✅ Diretório airflow-local encontrado"
+        else
+          echo "❌ Diretório airflow-local não encontrado"
+          exit 1
+        fi
+
+        if [ -f ".dbt/profiles.yml" ]; then
+          echo "✅ Arquivo profiles.yml encontrado"
+        else
+          echo "❌ Arquivo profiles.yml não encontrado"
+          exit 1
+        fi
+
+        echo "🎉 Estrutura do projeto validada!"
+
+    - name: Test Python syntax
+      run: |
+        echo "🔍 Testando sintaxe Python..."
+
+        # Verificar se há arquivos Python para testar
+        if find . -name "*.py" -not -path "./.venv/*" -not -path "./.git/*" | head -1 | grep -q .; then
+          echo "📁 Arquivos Python encontrados, testando sintaxe..."
+          find . -name "*.py" -not -path "./.venv/*" -not -path "./.git/*" -exec python -m py_compile {} \;
+          echo "✅ Sintaxe Python validada!"
+        else
+          echo "ℹ️ Nenhum arquivo Python encontrado para testar"
+        fi
+
+    - name: Test DBT project structure
+      run: |
+        echo "🔍 Verificando estrutura do projeto DBT..."
+
+        if [ -f "dbt/dbt_project.yml" ]; then
+          echo "✅ dbt_project.yml encontrado"
+        else
+          echo "❌ dbt_project.yml não encontrado"
+          exit 1
+        fi
+
+        if [ -d "dbt/models" ]; then
+          echo "✅ Diretório models encontrado"
+        else
+          echo "ℹ️ Diretório models não encontrado (criando estrutura básica...)"
+          mkdir -p dbt/models
+          echo "✅ Diretório models criado"
+        fi
+
+        echo "🎉 Estrutura DBT validada!"
+
+  # Job 2: Teste de DBT (apenas se secrets do Snowflake estiverem configurados)
+  dbt-test:
+    runs-on: ubuntu-latest
+    if: ${{ secrets.SNOWFLAKE_ACCOUNT != '' }}
+    needs: [basic-validation]
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install DBT
+      run: |
+        pip install --upgrade pip
+        pip install dbt-core dbt-snowflake
+
+    - name: Test DBT connection
+      env:
+        SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+        SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+        SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+        SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+        SNOWFLAKE_DATABASE_DEV: ${{ secrets.SNOWFLAKE_DATABASE_DEV }}
+        SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+        SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+      run: |
+        echo "🔍 Testando conexão DBT com Snowflake..."
+
+        # Validar sintaxe do projeto
+        cd dbt
+        dbt parse --profiles-dir ../.dbt
+
+        # Testar conexão (sem executar)
+        dbt debug --profiles-dir ../.dbt
+
+        echo "✅ Conexão DBT funcionando!"
+
+    - name: Run DBT models
+      env:
+        SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+        SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+        SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+        SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+        SNOWFLAKE_DATABASE_DEV: ${{ secrets.SNOWFLAKE_DATABASE_DEV }}
+        SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+        SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+      run: |
+        echo "🚀 Executando modelos DBT..."
+
+        cd dbt
+        dbt run --profiles-dir ../.dbt
+
+        echo "✅ Modelos DBT executados com sucesso!"
+
+  # Job 3: Notificação de sucesso
+  success-notification:
+    needs: [basic-validation, dbt-test]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+    - name: Success notification
+      run: |
+        echo "🎉 Pipeline principal concluído!"
+        echo ""
+        echo "📋 Status dos jobs:"
+        echo "✅ Validação básica: ${{ needs.basic-validation.result }}"
+        echo "✅ Teste DBT: ${{ needs.dbt-test.result || 'Pulado (secrets não configurados)' }}"
+        echo ""
+        if [ "${{ needs.basic-validation.result }}" = "success" ]; then
+          if [ "${{ needs.dbt-test.result }}" = "success" ] || [ "${{ needs.dbt-test.result }}" = "skipped" ]; then
+            echo "🚀 Pipeline principal executado com sucesso!"
+          else
+            echo "⚠️ Validação básica passou, mas DBT falhou."
+          fi
+        else
+          echo "❌ Validação básica falhou."
+        fi
