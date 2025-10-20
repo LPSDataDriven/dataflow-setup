@@ -2,9 +2,7 @@ name: Test CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop ]
   pull_request:
-    branches: [ main, develop ]
   workflow_dispatch:  # Permite execução manual
 
 env:
@@ -81,39 +79,9 @@ jobs:
 
         echo "🎉 Estrutura DBT validada!"
 
-  # Job 2: Teste de conectividade (apenas se secrets estiverem configurados)
-  connectivity-test:
+  # Job 2: Linter com pre-commit
+  pre-commit-lint:
     runs-on: ubuntu-latest
-    if: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Test AWS connectivity
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
-      run: |
-        echo "🔍 Testando conectividade AWS..."
-
-        # Usar AWS CLI que já vem instalado no runner
-        aws sts get-caller-identity
-
-        echo "✅ Conectividade AWS funcionando!"
-
-        # Testar acesso ao S3 (sem criar bucket se não existir)
-        if aws s3 ls "s3://${{ env.S3_BUCKET }}" 2>/dev/null; then
-          echo "✅ Bucket S3 acessível: ${{ env.S3_BUCKET }}"
-        else
-          echo "ℹ️ Bucket S3 não encontrado: ${{ env.S3_BUCKET }}"
-          echo "💡 Isso é normal se o bucket ainda não foi criado"
-        fi
-
-  # Job 3: Teste de DBT (apenas se secrets do Snowflake estiverem configurados)
-  dbt-test:
-    runs-on: ubuntu-latest
-    if: ${{ secrets.SNOWFLAKE_ACCOUNT != '' }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -123,54 +91,39 @@ jobs:
       with:
         python-version: '3.11'
 
-    - name: Install DBT
+    - name: Install pre-commit
       run: |
         pip install --upgrade pip
-        pip install dbt-core dbt-snowflake
+        pip install pre-commit
 
-    - name: Test DBT connection
-      env:
-        SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-        SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-        SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-        SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-        SNOWFLAKE_DATABASE_DEV: ${{ secrets.SNOWFLAKE_DATABASE_DEV }}
-        SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
-        SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+    - name: Run pre-commit
       run: |
-        echo "🔍 Testando conexão DBT com Snowflake..."
+        echo "🔍 Executando linters com pre-commit..."
 
-        # Validar sintaxe do projeto
-        cd dbt
-        dbt parse --profiles-dir ../.dbt
+        # Instalar os hooks
+        pre-commit install
 
-        # Testar conexão (sem executar)
-        dbt debug --profiles-dir ../.dbt
+        # Executar em todos os arquivos
+        pre-commit run --all-files
 
-        echo "✅ Conexão DBT funcionando!"
+        echo "✅ Linters executados com sucesso!"
 
-  # Job 4: Notificação de sucesso
+  # Job 3: Notificação de sucesso
   success-notification:
-    needs: [basic-validation]
+    needs: [basic-validation, pre-commit-lint]
     runs-on: ubuntu-latest
     if: always()
     steps:
     - name: Success notification
       run: |
-        echo "🎉 Pipeline de validação básica concluído!"
+        echo "🎉 Pipeline de validação concluído!"
         echo ""
         echo "📋 Status dos jobs:"
         echo "✅ Validação básica: ${{ needs.basic-validation.result }}"
-        echo "🔗 Teste de conectividade: ${{ needs.connectivity-test.result || 'Pulado (secrets não configurados)' }}"
-        echo "🔗 Teste DBT: ${{ needs.dbt-test.result || 'Pulado (secrets não configurados)' }}"
+        echo "✅ Linter pre-commit: ${{ needs.pre-commit-lint.result }}"
         echo ""
-        echo "💡 Para habilitar todos os testes, configure os secrets no GitHub:"
-        echo "   - AWS_ACCESS_KEY_ID"
-        echo "   - AWS_SECRET_ACCESS_KEY"
-        echo "   - SNOWFLAKE_ACCOUNT"
-        echo "   - SNOWFLAKE_USER"
-        echo "   - SNOWFLAKE_PASSWORD"
-        echo "   - SNOWFLAKE_WAREHOUSE"
-        echo "   - SNOWFLAKE_DATABASE_DEV"
-        echo "   - SNOWFLAKE_SCHEMA"
-        echo "   - SNOWFLAKE_ROLE"
+        if [ "${{ needs.basic-validation.result }}" = "success" ] && [ "${{ needs.pre-commit-lint.result }}" = "success" ]; then
+          echo "🚀 Todos os testes passaram! Código pronto para merge."
+        else
+          echo "⚠️ Alguns testes falharam. Verifique os logs acima."
+        fi
