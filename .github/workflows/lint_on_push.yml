@@ -1,0 +1,25 @@
+name: lint dbt project on PR
+
+on: [pull_request]
+
+jobs:
+  # this job runs SQLFluff with a specific set of rules
+  lint_project:
+    name: Run SQLFluff linter
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: "actions/checkout@v3"
+        with:
+          fetch-depth: 0
+      - name: Set up Python
+        uses: "actions/setup-python@v4"
+        with:
+          python-version: "3.11"
+
+      - name: Install SQLFluff
+        run: "python -m pip install sqlfluff"
+
+      - name: Lint modified files
+        run: "diff-quality --violations sqlfluff --compare-branch remotes/origin/main --fail-under=100"
