@@ -1,36 +1,40 @@
-[build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
 [project]
-name = "dbt-snowflake-setup"
+name = "dataflow-setup"
 version = "0.1.0"
-description = "DBT pipeline with Snowflake integration and utilities"
-readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 dependencies = [
-    "dbt-core",
-    "dbt-snowflake",
+    "dbt-core>=1.8.0",
+    "dbt-snowflake>=1.8.0",
+    "snowflake-connector-python[pandas]>=3.7.0",
+    "snowflake-snowpark-python>=1.11.0",
+    "pandas>=2.1.4",
+    "cryptography>=41.0.8",
+    "boto3>=1.34.0",
+    "botocore>=1.34.0",
+    "apache-airflow-providers-amazon>=8.15.0",
+    "apache-airflow-providers-postgres>=5.7.0",
+    "python-dotenv>=1.0.0",
     "pre-commit",
     "sqlfluff",
+    "sqlfluff-templater-dbt",
     "recce",
-    "pandas",
-    "snowflake-snowpark-python",
-    "snowflake-connector-python[pandas]",
-    "cryptography",
 ]
 
 [tool.uv]
+
 dev-dependencies = [
     "pytest",
     "pytest-mock",
+    "pytest-cov",
+    "moto",
     "black",
     "isort",
     "flake8",
+    "apache-airflow>=2.8.0",
+    "apache-airflow-providers-common-sql",
+    "awscli",
+    "aws-sam-cli",
 ]
-
-[tool.setuptools.packages.find]
-include = ["snowflake_utils*"]
 
 [tool.black]
 line-length = 88
@@ -39,3 +43,13 @@ target-version = ['py38']
 [tool.isort]
 profile = "black"
 line_length = 88
+
+[tool.airflow]
+local_airflow_version = "2.8.0"
+
+[tool.aws]
+default_region = "us-east-1"
+
+[tool.logging]
+level = "INFO"
+format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

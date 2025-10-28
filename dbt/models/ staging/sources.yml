@@ -1,0 +1,12 @@
+
+sources:
+  - name: financeiro
+    database: snowflake_sample_data
+    schema: tpch_sf1
+
+
+    tables:
+      - name: customer
+      - name: nation
+      - name: supplier
+      - name: orders

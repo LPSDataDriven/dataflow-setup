@@ -4,7 +4,7 @@ Este repositório é um template de partida para criar um projeto do zero contem
 
 - dbt Core (modelagem, testes, documentação)
 - Snowflake (warehouse, Snowpark, `snowflake-connector-python`)
-- Airflow (orquestração local e caminho para AWS MWAA/ECS)
+- Airflow (orquestração local com Docker)
 - AWS (S3 para artefatos/logs, Secrets Manager, IAM)
 
 O objetivo é fornecer um guia de setup inicial robusto e reaproveitável, além de uma estrutura base para evolução do projeto.
@@ -178,7 +178,7 @@ Esta base não impõe uma stack específica, mas sugere caminhos:
 - Airflow local: utilize um `docker-compose` com `webserver`, `scheduler` e `postgres` e a pasta `dags/` deste repositório. Uma DAG típica chama o dbt via CLI (por exemplo, `dbt build`).
 - AWS S3: armazene artefatos de execução (logs, manifest.json, run_results.json) e seeds estáticos.
 - AWS Secrets Manager: gerencie credenciais (Snowflake, etc.) e injete-as via conexão/variáveis do Airflow.
-- Airflow gerenciado: considere MWAA (Managed Workflows for Apache Airflow) na AWS ou Airflow em ECS/EKS. Ajuste a image para incluir `dbt-core`/`dbt-snowflake`.
+- Airflow gerenciado: para produção, considere Airflow em ECS/EKS ou outras soluções gerenciadas. Ajuste a image para incluir `dbt-core`/`dbt-snowflake`.
 
 Pontos de atenção:
 - Conexão do Airflow com Snowflake deve usar a mesma modalidade de autenticação (idealmente chave RSA ou usuário/senha rotacionada via Secrets Manager).
