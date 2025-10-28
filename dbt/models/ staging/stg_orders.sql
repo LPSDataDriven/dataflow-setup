@@ -1,5 +1,16 @@
 with source as (
-    select * from {{ source('financeiro', 'ORDERS') }}
+
+    select * from {{ source('financeiro', 'orders') }}
+
+),
+
+final as (
+    select
+        o_orderkey,
+        o_custkey,
+        o_totalprice
+    from source
+
 )
 
-select O_ORDERKEY, O_CUSTKEY, O_TOTALPRICE from source
+select * from final

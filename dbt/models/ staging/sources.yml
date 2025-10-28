@@ -1,14 +1,12 @@
 
-# especifica o local onde vai ser retiradas as informações.
 sources:
-  - name: financeiro  #?? nao sei o que é
-    database: SNOWFLAKE_SAMPLE_DATA # nome do banco de dados onde estao as tabelas
-    schema: TPCH_SF1 # nome do schema onde estao as tabelas
+  - name: financeiro
+    database: snowflake_sample_data
+    schema: tpch_sf1
 
-# lista das tabelas que serão utilizadas no projeto.
+
     tables:
-      - name: CUSTOMER
-      - name: NATION
-      - name: SUPPLIER
-      - name: ORDERS
-
+      - name: customer
+      - name: nation
+      - name: supplier
+      - name: orders

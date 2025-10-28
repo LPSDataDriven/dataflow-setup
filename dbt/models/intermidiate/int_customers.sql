@@ -1,18 +1,27 @@
 with customers as (
-    select *
-    from {{ ref('stg_customers') }}
+
+    select * from {{ ref('stg_customers') }}
+
 ),
+
 orders as (
-    select *
-    from {{ ref('stg_orders') }}
+
+    select * from {{ ref('stg_orders') }}
+
+),
+
+final as (
+
+    select
+        customers.c_custkey,
+        customers.c_name,
+        orders.o_orderkey,
+        orders.o_totalprice
+    from customers
+    inner join orders
+        on customers.c_custkey = orders.o_custkey
+    limit 100
+
 )
 
-select
-    c.C_CUSTKEY,
-    c.C_NAME,
-    o.O_ORDERKEY,
-    o.O_TOTALPRICE
-from customers as c
-join orders as o
-    on c.C_CUSTKEY = o.O_CUSTKEY
-limit 100
+select * from final
