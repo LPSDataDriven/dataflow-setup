@@ -1,6 +1,0 @@
-dbt-core
-dbt-snowflake
-pandas
-snowflake-connector-python[pandas]
-snowflake-snowpark-python
-cryptography

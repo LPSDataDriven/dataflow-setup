@@ -11,17 +11,27 @@ services:
       - "5432:5432"
     volumes:
       - airflow-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   airflow-init:
     build:
       context: .
       dockerfile: airflow/Dockerfile
-    image: dbt-airflow:latest
+    image: dataflow-airflow:latest
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     environment:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      DBT_PROFILES_DIR: /opt/airflow/.dbt
+      PYTHONPATH: /opt/airflow:/opt/airflow/dataflow
+      DBT_TARGET: dev
     entrypoint: ["bash", "-c"]
     command: |
       "airflow db init && airflow users create \
@@ -33,57 +43,64 @@ services:
         --password admin || true"
     volumes:
       - ./airflow/dags:/opt/airflow/dags
-      - ./my_dbt_project:/opt/airflow/my_dbt_project
+      - ./dbt:/opt/airflow/dbt
       - ./.dbt:/opt/airflow/.dbt
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
-      - ./:/opt/airflow/dbt_project
+      - ./dataflow:/opt/airflow/dataflow
       - ./.env:/opt/airflow/.env:ro
 
   airflow-scheduler:
-    image: dbt-airflow:latest
+    image: dataflow-airflow:latest
     restart: unless-stopped
     depends_on:
-      - airflow-init
-      - postgres
+      airflow-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
     environment:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       DBT_PROFILES_DIR: /opt/airflow/.dbt
-      PYTHONPATH: /opt/airflow:/opt/airflow/dbt_project
+      PYTHONPATH: /opt/airflow:/opt/airflow/dataflow
       DBT_TARGET: dev
     command: ["airflow", "scheduler"]
     volumes:
       - ./airflow/dags:/opt/airflow/dags
-      - ./my_dbt_project:/opt/airflow/my_dbt_project
+      - ./dbt:/opt/airflow/dbt
       - ./.dbt:/opt/airflow/.dbt
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
-      - ./:/opt/airflow/dbt_project
+      - ./dataflow:/opt/airflow/dataflow
       - ./.env:/opt/airflow/.env:ro
 
   airflow-webserver:
-    image: dbt-airflow:latest
+    image: dataflow-airflow:latest
     restart: unless-stopped
     depends_on:
-      - airflow-init
-      - postgres
+      airflow-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
     environment:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
       DBT_PROFILES_DIR: /opt/airflow/.dbt
-      PYTHONPATH: /opt/airflow:/opt/airflow/dbt_project
+      PYTHONPATH: /opt/airflow:/opt/airflow/dataflow
       DBT_TARGET: dev
     command: ["airflow", "webserver"]
     ports:
       - "8080:8080"
     volumes:
       - ./airflow/dags:/opt/airflow/dags
-      - ./my_dbt_project:/opt/airflow/my_dbt_project
+      - ./dbt:/opt/airflow/dbt
       - ./.dbt:/opt/airflow/.dbt
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
-      - ./:/opt/airflow/dbt_project
+      - ./dataflow:/opt/airflow/dataflow
       - ./.env:/opt/airflow/.env:ro
 
 volumes:

@@ -21,7 +21,6 @@ dependencies = [
 ]
 
 [tool.uv]
-
 dev-dependencies = [
     "pytest",
     "pytest-mock",
@@ -43,13 +42,3 @@ target-version = ['py38']
 [tool.isort]
 profile = "black"
 line_length = 88
-
-[tool.airflow]
-local_airflow_version = "2.8.0"
-
-[tool.aws]
-default_region = "us-east-1"
-
-[tool.logging]
-level = "INFO"
-format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
