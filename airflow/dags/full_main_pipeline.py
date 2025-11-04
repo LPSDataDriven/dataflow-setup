@@ -5,7 +5,7 @@ from airflow.decorators import task
 from airflow.models.param import Param
 from dbt_utils.connector import run_dbt_command, DbtRunConfig
 
-DEFAULT_PROJECT_DIR = "/opt/airflow/my_dbt_project"
+DEFAULT_PROJECT_DIR = "/opt/airflow/dbt"
 DEFAULT_PROFILES_DIR = "/opt/airflow/.dbt"
 
 with DAG(

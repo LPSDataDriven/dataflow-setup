@@ -3,7 +3,7 @@ from airflow import DAG
 from airflow.operators.bash import BashOperator
 
 # DBT variables
-DBT_PROJECT_DIR = "/opt/airflow/my_dbt_project"
+DBT_PROJECT_DIR = "/opt/airflow/dbt"
 DBT_PROFILES_DIR = "/opt/airflow/.dbt"
 DBT_TARGET = "dev"
 
