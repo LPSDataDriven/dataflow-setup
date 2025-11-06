@@ -81,7 +81,7 @@ def get_snowflake_private_key() -> bytes:
     snowflake_private_key_path = os.getenv("SNOWFLAKE_PRIVATE_KEY_PATH")
     snowflake_private_key_base64 = os.getenv("SNOWFLAKE_PRIVATE_KEY")
     snowflake_private_key_decoded = os.getenv("SNOWFLAKE_PRIVATE_KEY_DECODED")
-    snowflake_private_key_password = os.getenv("SNOWFLAKE_PRIVATE_KEY_PASSWORD")
+    snowflake_private_key_passphrase = os.getenv("SNOWFLAKE_PRIVATE_KEY_PASSPHRASE")
 
     if not snowflake_private_key_path and not snowflake_private_key_base64:
         raise ValueError("Configure SNOWFLAKE_PRIVATE_KEY_PATH ou SNOWFLAKE_PRIVATE_KEY")
@@ -89,18 +89,21 @@ def get_snowflake_private_key() -> bytes:
     if not snowflake_private_key_decoded:
         raise ValueError("SNOWFLAKE_PRIVATE_KEY_DECODED não foi gerada automaticamente")
 
-    if not snowflake_private_key_password:
-        snowflake_private_key_password = ""
-        logger.info("Chave privada sem senha detectada")
-
     try:
-        private_key_password = bytes(snowflake_private_key_password, "utf-8")
         private_key = bytes(snowflake_private_key_decoded, "utf-8")
+
+        # Tentar carregar a chave primeiro sem senha (para chaves não criptografadas)
+        private_key_password_bytes = None
+        if snowflake_private_key_passphrase:
+            private_key_password_bytes = bytes(snowflake_private_key_passphrase, "utf-8")
+            logger.info("Usando senha/passphrase fornecida para chave privada")
+        else:
+            logger.info("Tentando carregar chave privada sem senha")
 
         p_key: Any[rsa.RSAPrivateKey, dsa.DSAPrivateKey] = (
             serialization.load_pem_private_key(
                 private_key,
-                password=private_key_password if private_key_password else None,
+                password=private_key_password_bytes,
                 backend=default_backend()
             )
         )
@@ -114,6 +117,17 @@ def get_snowflake_private_key() -> bytes:
         logger.info("Chave privada carregada com sucesso")
         return pkb
 
+    except TypeError as e:
+        if "Password was not given but private key is encrypted" in str(e):
+            error_msg = (
+                "A chave privada está criptografada, mas nenhuma senha foi fornecida. "
+                "Configure a variável de ambiente SNOWFLAKE_PRIVATE_KEY_PASSPHRASE com a senha da chave."
+            )
+            logger.error(error_msg)
+            raise ValueError(error_msg) from e
+        else:
+            logger.error(f"Erro ao processar chave privada: {e}")
+            raise
     except Exception as e:
         logger.error(f"Erro ao processar chave privada: {e}")
         raise
