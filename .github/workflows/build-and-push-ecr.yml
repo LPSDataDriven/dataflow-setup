@@ -1,0 +1,101 @@
+name: Build and Push to ECR
+
+on:
+  push:
+    branches: [main, develop]
+  workflow_dispatch:  # Permite execução manual
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
+  ECR_REPOSITORY: dataflow-airflow
+
+jobs:
+  build-and-push:
+    name: Build Docker image and push to ECR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image tags
+        id: set-tags
+        run: |
+          # Determinar tags baseado na branch
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "IMAGE_TAG=main" >> $GITHUB_OUTPUT
+            echo "LATEST_TAG=true" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref }}" == "refs/heads/develop" ]; then
+            echo "IMAGE_TAG=develop" >> $GITHUB_OUTPUT
+            echo "LATEST_TAG=false" >> $GITHUB_OUTPUT
+          else
+            echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_OUTPUT
+            echo "LATEST_TAG=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Sempre criar tag com SHA para rastreabilidade
+          echo "SHA_TAG=${{ github.sha }}" >> $GITHUB_OUTPUT
+
+          # Registry completo
+          echo "ECR_REGISTRY=${{ steps.login-ecr.outputs.registry }}" >> $GITHUB_OUTPUT
+
+      - name: Build Docker image
+        env:
+          ECR_REGISTRY: ${{ steps.set-tags.outputs.ECR_REGISTRY }}
+          ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
+          IMAGE_TAG: ${{ steps.set-tags.outputs.IMAGE_TAG }}
+          SHA_TAG: ${{ steps.set-tags.outputs.SHA_TAG }}
+        run: |
+          echo "Building image: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          docker build \
+            -f airflow/Dockerfile \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$SHA_TAG \
+            .
+
+          # Se for main, também criar tag latest
+          if [ "${{ steps.set-tags.outputs.LATEST_TAG }}" == "true" ]; then
+            echo "Tagging as latest..."
+            docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          fi
+
+      - name: Push Docker image to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.set-tags.outputs.ECR_REGISTRY }}
+          ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
+          IMAGE_TAG: ${{ steps.set-tags.outputs.IMAGE_TAG }}
+          SHA_TAG: ${{ steps.set-tags.outputs.SHA_TAG }}
+        run: |
+          echo "Pushing image: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$SHA_TAG
+
+          # Se for main, também push latest
+          if [ "${{ steps.set-tags.outputs.LATEST_TAG }}" == "true" ]; then
+            echo "Pushing latest tag..."
+            docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          fi
+
+          echo "✅ Image pushed successfully!"
+          echo "Registry: $ECR_REGISTRY"
+          echo "Repository: $ECR_REPOSITORY"
+          echo "Tags: $IMAGE_TAG, $SHA_TAG"
+
+      - name: Output image URI
+        run: |
+          echo "📦 Docker image URI:"
+          echo "${{ steps.set-tags.outputs.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ steps.set-tags.outputs.IMAGE_TAG }}"
+          echo ""
+          echo "🔍 To use this image in EC2, update docker-compose.override.yml with:"
+          echo "image: ${{ steps.set-tags.outputs.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ steps.set-tags.outputs.IMAGE_TAG }}"

@@ -69,8 +69,6 @@ unset PS1
 ```
 Instale o `direnv` e habilite no shell:
 ```bash
-# macOS
-brew install direnv
 # Ubuntu/Debian
 sudo apt-get install direnv
 
@@ -87,20 +85,40 @@ Observação: o aviso "PS1 cannot be exported" pode aparecer e é esperado; não
 
 Este arquivo centraliza dependências e ferramentas do projeto.
 
-- Dependências principais (`[project].dependencies`):
+### Estrutura das dependências
+
+**`[project].dependencies`** - Dependências de produção (sempre instaladas):
   - `dbt-core`, `dbt-snowflake`: base do dbt e adaptador Snowflake
   - `pre-commit`, `sqlfluff`: qualidade e lint de SQL
   - `recce`: ferramenta de QA para dados
   - `pandas`: utilidades de manipulação de dados
   - `snowflake-snowpark-python`, `snowflake-connector-python[pandas]`: integração com Snowflake
   - `cryptography`: suporte a chaves RSA
-- Dev dependencies (`[tool.uv].dev-dependencies`): `pytest`, `black`, `isort`, `flake8`, etc.
-- Formatadores: configurações de `black` e `isort`.
 
-Após alterações no `pyproject.toml`, rode:
+**`[tool.uv].dev-dependencies`** - Dependências de desenvolvimento (apenas para desenvolvimento local):
+  - `pytest`, `pytest-mock`, `pytest-cov`, `moto`: testes
+  - `black`, `isort`, `flake8`: formatadores e linters
+  - `apache-airflow>=2.8.0`: Airflow para desenvolvimento local
+  - `awscli`, `aws-sam-cli`: ferramentas AWS para desenvolvimento
+
+### Instalação das dependências
+
+**Para desenvolvimento local** (recomendado):
+```bash
+uv pip install -e ".[dev]"
+```
+Instala **todas** as dependências: produção + desenvolvimento (pytest, black, isort, etc.)
+
+**Para produção** (apenas dependências essenciais):
 ```bash
 uv pip install -e .
 ```
+Instala **apenas** as dependências de produção (sem black, isort, pytest, etc.)
+
+### Configurações de formatação
+
+- `[tool.black]`: configuração do Black (formatação automática)
+- `[tool.isort]`: configuração do isort (ordenação de imports)
 
 ## Estrutura sugerida do repositório
 
@@ -109,13 +127,20 @@ Exemplo mínimo (ajuste conforme a necessidade):
 .
 ├── .dbt/
 │   └── profiles.yml               # perfis do dbt (NÃO commitar credenciais reais)
-├── models/                        # modelos dbt (staging, marts, etc.)
-├── snapshots/
-├── seeds/
-├── analyses/
-├── macros/
-├── snowflake_utils/               # utilitários Python para Snowflake/Snowpark
-├── dags/                          # DAGs do Airflow (ex.: execução de dbt)
+├── dbt/                           # projeto dbt
+│   ├── dbt_project.yml
+│   ├── models/                    # modelos dbt (staging, marts, etc.)
+│   ├── snapshots/
+│   ├── seeds/
+│   ├── analyses/
+│   ├── macros/
+│   └── tests/
+├── dataflow/                      # utilitários Python para Snowflake/Snowpark
+├── airflow/                       # configuração do Airflow (Docker, ECR)
+│   ├── Dockerfile                 # Imagem Docker usando UV
+│   ├── build-ecr.sh              # Script para build/push ECR
+│   ├── setup-ecr.sh              # Script para criar repositório ECR
+│   └── dags/                      # DAGs do Airflow (ex.: execução de dbt)
 ├── .sqlfluff
 ├── .pre-commit-config.yaml
 ├── .envrc
@@ -131,27 +156,44 @@ Exemplo mínimo (ajuste conforme a necessidade):
 dbt init my_dbt_project
 ```
 
-2) Crie/configure `~/.dbt/profiles.yml` OU use uma pasta `.dbt/` no repositório com `profiles.yml` (como neste template). Exemplo de autenticação via chave RSA:
+2) Crie/configure `~/.dbt/profiles.yml` OU use uma pasta `.dbt/` no repositório com `profiles.yml` (como neste template). Exemplo de autenticação via chave RSA usando variáveis de ambiente:
 ```yaml
 my_dbt_project:
   target: dev
   outputs:
-    dev:
+    # Common Snowflake connection settings
+    defaults: &snowflake_defaults
       type: snowflake
-      account: ${SNOWFLAKE_ACCOUNT}
-      user: ${SNOWFLAKE_USER}
-      role: ${SNOWFLAKE_ROLE}
-      database: ${SNOWFLAKE_DATABASE}
-      warehouse: ${SNOWFLAKE_WAREHOUSE}
-      schema: ${SNOWFLAKE_SCHEMA}
-      authenticator: rsa_key_pair
-      private_key_path: ${SNOWFLAKE_PRIVATE_KEY_PATH}
-      client_session_keep_alive: true
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE') }}"
+      private_key_path: "{{ env_var('SNOWFLAKE_PRIVATE_KEY_PATH') }}"
+      private_key_passphrase: "{{ env_var('SNOWFLAKE_PRIVATE_KEY_PASSPHRASE') }}"
+      database: "{{ env_var('SNOWFLAKE_DATABASE_DEV') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE') }}"
+      client_session_keep_alive: False
+      threads: 10
+      query_tag: "{{ env_var('SNOWFLAKE_QUERY_TAG') }}"
+
+    dev:
+      <<: *snowflake_defaults
+      schema: "{{ env_var('SNOWFLAKE_SCHEMA') }}"
+
+    stage:
+      <<: *snowflake_defaults
+      schema: stage
+
+    # For read-only access to prod for recce
+    prod-read-only:
+      <<: *snowflake_defaults
+      database: "{{ env_var('SNOWFLAKE_DATABASE_PROD') }}"
+      schema: prod
 ```
 
 3) Chave RSA no Snowflake
 - Gere um par de chaves RSA localmente e configure a chave pública no usuário Snowflake.
 - Armazene o caminho da chave privada em `${SNOWFLAKE_PRIVATE_KEY_PATH}` no `.env`.
+- Se a chave privada estiver protegida por senha (recomendado), configure também `${SNOWFLAKE_PRIVATE_KEY_PASSPHRASE}` no `.env` com a senha da chave.
 
 4) Verifique a instalação e a conexão
 ```bash
@@ -162,14 +204,38 @@ dbt build
 
 ## Qualidade de código: pre-commit e sqlfluff
 
+O [pre-commit](https://pre-commit.com/) é um framework para gerenciar hooks de git que executam verificações antes de cada commit. Ele permite identificar problemas simples (como trailing whitespace, formatação incorreta, problemas de lint) antes da revisão de código, economizando tempo tanto do desenvolvedor quanto do revisor.
+
 1) Garanta que os arquivos `.pre-commit-config.yaml` e `.sqlfluff` existam e reflitam suas regras.
 
-2) Instale e habilite os hooks
+2) Verifique a instalação e configure os hooks do git
 ```bash
+# Verifique se o pre-commit está instalado (já vem com uv pip install -e .)
 pre-commit --version
+
+# Instale os hooks do git (isso configura os scripts em .git/hooks/pre-commit)
 pre-commit install
 ```
-Após isso, os hooks rodam automaticamente nos commits.
+
+Após isso, os hooks rodam automaticamente em cada `git commit`. O pre-commit gerencia o download e execução de qualquer hook escrito em qualquer linguagem antes de cada commit.
+
+3) (Opcional) Execute os hooks em todos os arquivos
+Quando você adiciona novos hooks, é recomendado executá-los em todos os arquivos do projeto para garantir que tudo está em conformidade:
+```bash
+pre-commit run --all-files
+```
+
+Isso executa todos os hooks configurados em todos os arquivos, não apenas nos arquivos alterados. Durante um commit normal, o pre-commit executa apenas nos arquivos modificados.
+
+4) Executar hooks manualmente
+Você também pode executar os hooks manualmente sem fazer commit:
+```bash
+# Executa apenas nos arquivos staged
+pre-commit run
+
+# Executa um hook específico
+pre-commit run sqlfluff-lint --all-files
+```
 
 ## Integração com Airflow e AWS
 
@@ -188,9 +254,14 @@ Pontos de atenção:
 
 Ambiente e dependências:
 ```bash
+# Criar ambiente virtual
 uv venv --python=3.12
-uv pip install -e .
+
+# Para desenvolvimento (instala tudo: produção + dev)
 uv pip install -e ".[dev]"
+
+# Para produção (apenas dependências essenciais)
+uv pip install -e .
 ```
 
 dbt básico:
