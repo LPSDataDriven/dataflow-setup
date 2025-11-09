@@ -31,14 +31,7 @@ services:
       PYTHONPATH: /opt/airflow:/opt/airflow/dataflow
       DBT_TARGET: dev
     entrypoint: ["bash", "-c"]
-    command: |
-      airflow db init && airflow users create \
-        --username admin \
-        --firstname Admin \
-        --lastname User \
-        --role Admin \
-        --email admin@example.com \
-        --password admin || true
+    command: "airflow db init && airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password admin || true"
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./dbt:/opt/airflow/dbt

@@ -17,7 +17,7 @@ O objetivo é fornecer um guia de setup inicial robusto e reaproveitável, além
 - Estrutura sugerida do repositório
 - Configuração do dbt + Snowflake (`profiles.yml`, chave RSA, conexão)
 - Qualidade de código: `pre-commit` e `sqlfluff`
-- Integração com Airflow e AWS
+- Integração com Airflow e AWS (local, ECR e EC2)
 - Comandos úteis
 - Troubleshooting
 
@@ -151,12 +151,7 @@ Exemplo mínimo (ajuste conforme a necessidade):
 
 ## Configuração dbt + Snowflake
 
-1) Inicialize um projeto dbt (se ainda não existir)
-```bash
-dbt init my_dbt_project
-```
-
-2) Crie/configure `~/.dbt/profiles.yml` OU use uma pasta `.dbt/` no repositório com `profiles.yml` (como neste template). Exemplo de autenticação via chave RSA usando variáveis de ambiente:
+1) Crie/configure `~/.dbt/profiles.yml` OU use uma pasta `.dbt/` no repositório com `profiles.yml` (como neste template). Exemplo de autenticação via chave RSA usando variáveis de ambiente:
 ```yaml
 my_dbt_project:
   target: dev
@@ -241,14 +236,137 @@ pre-commit run sqlfluff-lint --all-files
 
 Esta base não impõe uma stack específica, mas sugere caminhos:
 
-- Airflow local: utilize um `docker-compose` com `webserver`, `scheduler` e `postgres` e a pasta `dags/` deste repositório. Uma DAG típica chama o dbt via CLI (por exemplo, `dbt build`).
-- AWS S3: armazene artefatos de execução (logs, manifest.json, run_results.json) e seeds estáticos.
-- AWS Secrets Manager: gerencie credenciais (Snowflake, etc.) e injete-as via conexão/variáveis do Airflow.
-- Airflow gerenciado: para produção, considere Airflow em ECS/EKS ou outras soluções gerenciadas. Ajuste a image para incluir `dbt-core`/`dbt-snowflake`.
+### Airflow Local (Desenvolvimento)
 
-Pontos de atenção:
+Para desenvolvimento local, utilize o `docker-compose.yml` com `webserver`, `scheduler` e `postgres`:
+
+```bash
+# Build da imagem local
+docker-compose build
+
+# Iniciar todos os serviços
+docker-compose up -d
+
+# Acessar Airflow UI
+open http://localhost:8080
+# Usuário: admin
+# Senha: admin
+```
+
+Uma DAG típica chama o dbt via CLI (por exemplo, `dbt build`). Veja [docs/DOCKER-COMPOSE.md](docs/DOCKER-COMPOSE.md) para explicação detalhada.
+
+### AWS ECR (Registry de Imagens Docker)
+
+O **AWS ECR** é usado para armazenar a imagem Docker do Airflow, permitindo compartilhar e usar a mesma imagem em diferentes ambientes (local, EC2, etc.).
+
+**Setup inicial do ECR:**
+
+```bash
+# Configurar variáveis
+export AWS_ACCOUNT_ID=<seu-account-id>
+export AWS_REGION=us-east-1
+export ECR_REPO_NAME=dataflow-airflow
+
+# Criar repositório ECR
+./airflow/setup-ecr.sh
+```
+
+**Build e push da imagem:**
+
+```bash
+# Build e push para ECR
+./airflow/build-ecr.sh develop  # ou main, v1.0.0, etc.
+```
+
+**Custos ECR** (free tier):
+- Storage: Primeiros 500MB/mês = **GRATUITO** ✅
+- Data Transfer: Primeiro 1GB/mês = **GRATUITO** ✅
+- Total estimado: **$0.00/mês** para projetos pequenos/médios ✅
+
+📚 **Documentação completa**: Veja [docs/ECR-COSTS-AND-ALTERNATIVES.md](docs/ECR-COSTS-AND-ALTERNATIVES.md) para detalhes de custos e alternativas.
+
+### AWS EC2 (Produção/Demonstração)
+
+Para ter um ambiente acessível publicamente ou para produção, você pode rodar o Airflow em uma instância EC2 usando a imagem do ECR.
+
+**Passos principais:**
+
+1. **Criar instância EC2** (t3.small recomendado, t3.micro funciona)
+   - AMI: Amazon Linux 2023
+   - Security Group: SSH (22) + Airflow UI (8080)
+   - IAM Role com política `AmazonEC2ContainerRegistryReadOnly` (opcional, facilita acesso ao ECR)
+
+2. **Instalar Docker e Docker Compose na EC2:**
+```bash
+sudo dnf update -y
+sudo dnf install -y docker git awscli
+sudo systemctl enable --now docker
+sudo usermod -aG docker ec2-user
+
+# Docker Compose
+sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+```
+
+3. **Autenticar no ECR e clonar repositório:**
+```bash
+# Autenticar no ECR
+export AWS_REGION=us-east-1
+export AWS_ACCOUNT_ID=<seu-account-id>
+aws ecr get-login-password --region $AWS_REGION | \
+  docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+
+# Clonar repositório
+git clone <seu-repo> dataflow-setup
+cd dataflow-setup
+```
+
+4. **Configurar docker-compose.override.yml para usar imagem do ECR:**
+```bash
+cat > docker-compose.override.yml <<'YAML'
+services:
+  airflow-init:
+    image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/dataflow-airflow:main
+
+  airflow-scheduler:
+    image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/dataflow-airflow:main
+
+  airflow-webserver:
+    image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/dataflow-airflow:main
+YAML
+```
+
+5. **Iniciar serviços:**
+```bash
+docker-compose pull
+docker-compose up -d
+```
+
+**Custos EC2** (estimativa):
+- t3.micro: **$0.00** (free tier) ou **~$7-10/mês** após free tier
+- t3.small: **~$15-20/mês**
+- Elastic IP: **$0.00** se associado a instância rodando
+
+📚 **Documentação completa**: Veja [docs/EC2-AIRFLOW-ECR-SETUP.md](docs/EC2-AIRFLOW-ECR-SETUP.md) para guia passo a passo detalhado.
+
+### CI/CD com GitHub Actions
+
+O projeto inclui workflows do GitHub Actions para:
+- **Validação automática** (lint, pre-commit) em PRs
+- **Build e push automático** para ECR ao fazer merge em `develop` ou `main`
+
+📚 **Documentação completa**: Veja [docs/PRODUCTION-GUIDE.md](docs/PRODUCTION-GUIDE.md) para fluxo completo de CI/CD e produção.
+
+### Outros Serviços AWS
+
+- **AWS S3**: armazene artefatos de execução (logs, manifest.json, run_results.json) e seeds estáticos.
+- **AWS Secrets Manager**: gerencie credenciais (Snowflake, etc.) e injete-as via conexão/variáveis do Airflow.
+
+### Pontos de atenção
+
 - Conexão do Airflow com Snowflake deve usar a mesma modalidade de autenticação (idealmente chave RSA ou usuário/senha rotacionada via Secrets Manager).
-- Garanta que as roles Snowflake e permissões IAM (S3/Secrets) estejam corretas.
+- Garanta que as roles Snowflake e permissões IAM (S3/Secrets/ECR) estejam corretas.
+- Para acesso seguro à UI do Airflow em EC2, considere usar SSH Tunnel (veja [docs/AIRFLOW-UI-ACCESS.md](docs/AIRFLOW-UI-ACCESS.md)).
 
 ## Comandos úteis
 
