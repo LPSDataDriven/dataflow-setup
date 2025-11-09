@@ -2,8 +2,6 @@ name: Lint and format check
 
 on:
   pull_request:
-  push:
-    branches: [develop, main, master]
 
 jobs:
   lint:
@@ -37,18 +35,6 @@ jobs:
 
       - name: Run pre-commit hooks
         run: |
-          # Sempre roda apenas nos arquivos modificados (mais rápido e eficiente)
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            # Em PRs: compara com a branch base do PR
-            echo "Running pre-commit on modified files in PR..."
-            pre-commit run --from-ref ${{ github.event.pull_request.base.sha }} --to-ref ${{ github.event.pull_request.head.sha }}
-          else
-            # Em push: compara com o commit anterior (se disponível)
-            echo "Running pre-commit on modified files in push..."
-            if [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
-              pre-commit run --from-ref ${{ github.event.before }} --to-ref ${{ github.sha }}
-            else
-              # Fallback: roda apenas no último commit se não conseguir determinar o anterior
-              pre-commit run HEAD~1..HEAD
-            fi
-          fi
+          # Roda apenas nos arquivos modificados no PR (mais rápido e eficiente)
+          echo "Running pre-commit on modified files in PR..."
+          pre-commit run --from-ref ${{ github.event.pull_request.base.sha }} --to-ref ${{ github.event.pull_request.head.sha }}

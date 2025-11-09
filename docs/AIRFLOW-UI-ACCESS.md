@@ -27,19 +27,23 @@ Para acessar a **UI do Airflow**, você precisa:
 
 **Configuração**:
 ```bash
-# 1. Autenticar no ECR
-aws ecr get-login-password --region us-east-1 | \
-  docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com
+# O docker-compose.yml atual está configurado para build local
+# (usa 'build:' com context: . e dockerfile: airflow/Dockerfile)
 
-# 2. Atualizar docker-compose.yml para usar imagem do ECR
-# (ou usar build local normalmente)
+# 1. Build da imagem local
+docker-compose build
 
-# 3. Iniciar
+# 2. Iniciar serviços
 docker-compose up -d
 
-# 4. Acessar
+# 3. Acessar
 open http://localhost:8080
 ```
+
+**Nota**: Se quiser usar imagem do ECR localmente (em vez de build local), você precisaria:
+1. Autenticar no ECR
+2. Criar um `docker-compose.override.yml` para sobrescrever e usar a imagem do ECR
+3. Veja [docs/EC2-AIRFLOW-ECR-SETUP.md](EC2-AIRFLOW-ECR-SETUP.md) para exemplo completo
 
 **Vantagens**:
 - ✅ Grátis
