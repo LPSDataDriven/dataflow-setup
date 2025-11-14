@@ -23,6 +23,10 @@ COPY --chown=root:root pyproject.toml uv.lock* ./
 # Instalar como root para ter permissão de escrever em /usr/local
 RUN uv pip install --system -e .
 
+# Copiar script de inicialização (como root para ter permissão)
+COPY --chown=airflow:root airflow/init-airflow.sh /opt/airflow/init-airflow.sh
+RUN chmod +x /opt/airflow/init-airflow.sh
+
 # Voltar para usuário airflow
 USER airflow
 
